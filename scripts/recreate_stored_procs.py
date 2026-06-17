@@ -43,7 +43,7 @@ def split_statements(filename, content):
             cleaned_lines = []
             for line in lines:
                 l = line.strip()
-                if l.upper().startswith("DELIMITER"):
+                if l.upper().startswith("DELIMITER") or l.upper().startswith("USE "):
                     continue
                 cleaned_lines.append(line)
             stmt = "\n".join(cleaned_lines).strip()
