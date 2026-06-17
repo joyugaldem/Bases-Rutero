@@ -509,6 +509,16 @@ def factura_anular(id):
     return redirect(url_for("factura_detalle", id=id))
 
 
+@app.route("/facturacion/<int:id>/eliminar", methods=["POST"])
+def factura_eliminar(id):
+    try:
+        _, out = call_proc_out("sp_trx_anular_factura", [id, None])
+        flash("Factura eliminada.", "info")
+    except Exception as e:
+        flash(f"Error al eliminar: {e}", "danger")
+    return redirect(url_for("facturacion_lista"))
+
+
 # ============================================================
 # MÓDULO: REPORTES
 # ============================================================

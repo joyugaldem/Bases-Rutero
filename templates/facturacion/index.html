@@ -44,7 +44,14 @@
           <td><span class="badge bg-{{ 'primary' if f.condicion_pago == 'Crédito' else 'secondary' }}">{{ f.condicion_pago }}</span></td>
           <td>₡{{ "{:,.2f}".format(f.total) }}</td>
           <td><span class="badge badge-estado-{{ f.estado_factura }}">{{ f.estado_factura }}</span></td>
-          <td><a href="{{ url_for('factura_detalle', id=f.id_factura) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a></td>
+          <td class="text-end">
+            <a href="{{ url_for('factura_detalle', id=f.id_factura) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>
+            {% if f.estado_factura in ['Emitida', 'Pendiente'] %}
+            <form method="post" action="{{ url_for('factura_eliminar', id=f.id_factura) }}" class="d-inline" onsubmit="return confirm('¿Eliminar la factura {{ f.numero_factura }}?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
       {% else %}
         <tr><td colspan="8" class="text-center text-muted py-4">Sin facturas en el período.</td></tr>
