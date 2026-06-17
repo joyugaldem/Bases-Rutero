@@ -13,3 +13,6 @@ DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
 
 SECRET_KEY  = os.environ.get("SECRET_KEY", "lacteos_tec_2026_secreto")
 FLASK_DEBUG = os.environ.get("FLASK_DEBUG", "1") == "1"
+
+if not FLASK_DEBUG and SECRET_KEY == "lacteos_tec_2026_secreto":
+    raise RuntimeError("SECRET_KEY no puede ser el valor por defecto en producción")

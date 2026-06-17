@@ -141,8 +141,13 @@ BEGIN
 
     START TRANSACTION;
 
-    -- Bloquear el registro de crédito para actualización
-    SELECT saldo_pendiente INTO v_saldo_actual
+    IF NOT EXISTS (SELECT 1 FROM factura_credito WHERE id_factura = p_id_factura_credito) THEN
+        SET p_mensaje = 'Error: la factura no tiene registro de crédito.';
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'no_credito';
+    END IF;
+
+    SELECT IFNULL(saldo_pendiente, 0) INTO v_saldo_actual
     FROM factura_credito WHERE id_factura = p_id_factura_credito FOR UPDATE;
 
     IF p_monto > v_saldo_actual THEN
@@ -163,7 +168,7 @@ BEGIN
     COMMIT;
     SET p_mensaje = IF(p_saldo_restante = 0,
         'Pago registrado. Factura cancelada por completo.',
-        CONCAT('Pago registrado. Saldo restante: ₡', FORMAT(p_saldo_restante, 2)));
+        CONCAT('Pago registrado. Saldo restante: ₡', CAST(ROUND(p_saldo_restante, 2) AS CHAR)));
 END //
 
 -- ============================================================
@@ -322,6 +327,12 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'estado_invalido';
     END IF;
 
+    IF v_cond_pago = 'Crédito' AND EXISTS (SELECT 1 FROM pago WHERE id_factura_credito = p_id_factura) THEN
+        SET p_mensaje = 'Error: la factura tiene pagos registrados. Anule primero los pagos.';
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'factura_con_pagos';
+    END IF;
+
     -- Restaurar stock de cada lote usando cursor
     OPEN cur_detalles;
     lotes_loop: LOOP
@@ -334,9 +345,8 @@ BEGIN
     END LOOP;
     CLOSE cur_detalles;
 
-    -- Eliminar registro de crédito si aplica
+    -- Eliminar registro de crédito si aplica (sin tocar pagos - son históricos)
     IF v_cond_pago = 'Crédito' THEN
-        DELETE FROM pago WHERE id_factura_credito = p_id_factura;
         DELETE FROM factura_credito WHERE id_factura = p_id_factura;
     END IF;
 
@@ -344,6 +354,27 @@ BEGIN
 
     COMMIT;
     SET p_mensaje = 'Factura anulada y stock restaurado correctamente.';
+END //
+
+-- ============================================================
+-- TRX-06: sp_consultar_factura
+-- Consulta una factura individual por ID con toda la info
+-- necesaria para la página de detalle.
+-- ============================================================
+DROP PROCEDURE IF EXISTS sp_consultar_factura //
+CREATE PROCEDURE sp_consultar_factura(IN p_id_factura INT)
+BEGIN
+    SELECT f.id_factura, f.numero_factura, c.razon_social AS cliente,
+           p.nombre AS repartidor, f.fecha_emision,
+           f.condicion_pago, f.estado_factura, f.total,
+           ru.nombre AS ruta
+    FROM factura f
+    JOIN cliente c ON c.id_cliente = f.id_cliente
+    JOIN repartidor rep ON rep.id_repartidor = f.id_repartidor
+    JOIN persona p ON p.id_persona = rep.id_persona
+    JOIN recorrido_ruta rr ON rr.id_recorrido = f.id_recorrido
+    JOIN ruta ru ON ru.id_ruta = rr.id_ruta
+    WHERE f.id_factura = p_id_factura;
 END //
 
 DELIMITER ;

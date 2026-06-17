@@ -159,10 +159,18 @@ CREATE PROCEDURE sp_insertar_cliente(
 )
 BEGIN
     DECLARE v_id_persona INT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SET p_id_cliente = NULL;
+    END;
+
+    START TRANSACTION;
     CALL sp_insertar_persona(p_nombre, v_id_persona);
     INSERT INTO cliente (id_persona, id_ruta, razon_social, direccion_compuesta, credito_autorizado)
     VALUES (v_id_persona, p_id_ruta, TRIM(p_razon_social), p_direccion, p_credito);
     SET p_id_cliente = LAST_INSERT_ID();
+    COMMIT;
 END //
 
 DROP PROCEDURE IF EXISTS sp_modificar_cliente //

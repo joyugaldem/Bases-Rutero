@@ -13,6 +13,13 @@ app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 app.teardown_appcontext(close_db)
 
+
+def form_required(*keys):
+    missing = [k for k in keys if not request.form.get(k, "").strip()]
+    if missing:
+        raise ValueError(f"Campos requeridos faltantes: {', '.join(missing)}")
+    return [request.form[k].strip() for k in keys]
+
 # ============================================================
 # INICIO
 # ============================================================
@@ -462,8 +469,8 @@ def factura_nueva():
 
 @app.route("/facturacion/<int:id>")
 def factura_detalle(id):
-    rows     = call_proc("sp_consultar_facturas", [None, None, None])
-    factura  = next((f for f in (rows[0] if rows else []) if f["id_factura"] == id), None)
+    rows     = call_proc("sp_consultar_factura", [id])
+    factura  = rows[0][0] if rows and rows[0] else None
     if not factura:
         flash("Factura no encontrada.", "warning")
         return redirect(url_for("facturacion_lista"))
@@ -513,10 +520,10 @@ def factura_anular(id):
 def factura_eliminar(id):
     try:
         _, out = call_proc_out("sp_trx_anular_factura", [id, None])
-        flash("Factura eliminada.", "info")
+        flash(out[1] or "Factura anulada.", "info")
     except Exception as e:
         flash(f"Error al eliminar: {e}", "danger")
-    return redirect(url_for("facturacion_lista"))
+    return redirect(url_for("factura_detalle", id=id))
 
 
 # ============================================================
@@ -559,4 +566,4 @@ def rpt_top_productos():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=config.FLASK_DEBUG, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

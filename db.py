@@ -4,9 +4,12 @@ Provee una conexión MySQL por solicitud y helpers para
 llamar stored procedures y ejecutar queries.
 """
 
+import logging
 import mysql.connector
 from flask import g
 import config
+
+logger = logging.getLogger(__name__)
 
 
 def get_db():
@@ -70,13 +73,19 @@ def call_proc_out(proc_name, args):
     """
     conn = get_db()
     cur = conn.cursor()
-    out_args = cur.callproc(proc_name, args)
-    results = []
-    for rs in cur.stored_results():
-        results.append(rs.fetchall())
-    conn.commit()
-    cur.close()
-    return results, list(out_args)
+    try:
+        out_args = cur.callproc(proc_name, args)
+        results = []
+        for rs in cur.stored_results():
+            results.append(rs.fetchall())
+        conn.commit()
+        cur.close()
+        return results, list(out_args)
+    except Exception:
+        logger.exception("call_proc_out(%s) failed", proc_name)
+        conn.rollback()
+        cur.close()
+        raise
 
 
 def execute(sql, params=None):

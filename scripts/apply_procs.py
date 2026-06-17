@@ -1,12 +1,22 @@
-"""Apply all SQL files to Railway MySQL via public proxy."""
-import re, glob, os
+"""Apply all SQL files to Railway MySQL via public proxy.
+
+Requires environment variables:
+  APPLY_DB_HOST, APPLY_DB_PORT, APPLY_DB_USER, APPLY_DB_PASSWORD, APPLY_DB_NAME
+See .env.example for local defaults.
+"""
+import re, glob, os, sys
 import mysql.connector
 
-HOST = "thomas.proxy.rlwy.net"
-PORT = 51505
-USER = "root"
-PASSWORD = "fMYzIpahogVvRVHCACmBTOBQMzAEZevy"
-DB = "railway"
+HOST     = os.environ.get("APPLY_DB_HOST", "localhost")
+PORT     = int(os.environ.get("APPLY_DB_PORT", "3306"))
+USER     = os.environ.get("APPLY_DB_USER", "root")
+PASSWORD = os.environ.get("APPLY_DB_PASSWORD", "")
+DB       = os.environ.get("APPLY_DB_NAME", "lacteosdb")
+
+required = ["APPLY_DB_HOST", "APPLY_DB_USER", "APPLY_DB_PASSWORD", "APPLY_DB_NAME"]
+missing = [v for v in required if not os.environ.get(v)]
+if missing:
+    sys.exit(f"Faltan variables de entorno requeridas: {', '.join(missing)}")
 
 
 def split_sql(content):
@@ -76,14 +86,13 @@ def main():
             content = fh.read()
 
         stmts = split_sql(content)
-        ok = fail = 0
+        ok = fail = skip = 0
+        cur = conn.cursor()
         for s in stmts:
             if not s.strip():
                 continue
-            cur = conn.cursor()
             try:
                 cur.execute(s)
-                # consume any leftover result sets (from triggers, etc.)
                 try:
                     cur.fetchall()
                 except Exception:
@@ -98,14 +107,14 @@ def main():
                 err = str(e)
                 if ("already exists" in err.lower() or "duplicate" in err.lower()
                         or "database exists" in err.lower()):
-                    ok += 1  # idempotent
+                    skip += 1
+                    print(f"   [skip] {s[:80].strip()}: {err[:60]}")
                 else:
                     fail += 1
                     print(f"   [!] {s[:80].strip()}... -> {err[:120]}")
-            finally:
-                cur.close()
+        cur.close()
         total += ok
-        print(f"   {ok} ok, {fail} errores")
+        print(f"   {ok} ok, {skip} skip, {fail} errores")
 
     conn.close()
     print(f"\nCompleto. {total} sentencias ejecutadas.")
