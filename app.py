@@ -488,7 +488,8 @@ def factura_pagar(id):
                 request.form.get("comprobante") or None,
                 None, None, None
             ])
-            flash(out[6], "success" if "exitosamente" in (out[6] or "") else "info")
+            msg = out[6] if len(out) > 6 and out[6] else "Pago procesado."
+            flash(msg, "success" if "registrado" in (msg or "") and "Error" not in (msg or "") else "info")
         except Exception as e:
             flash(f"Error al registrar pago: {e}", "danger")
         return redirect(url_for("factura_detalle", id=id))
