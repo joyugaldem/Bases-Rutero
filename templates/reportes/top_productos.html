@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Top Productos Vendidos{% endblock %}
+{% block content %}
+<h2 class="mb-3"><i class="bi bi-trophy me-2 text-warning"></i>Top Productos Vendidos</h2>
+<form method="get" class="card card-body mb-3 p-3" id="frmFiltro">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label form-label-sm">Desde</label>
+      <input type="date" name="desde" id="desde" class="form-control form-control-sm" value="{{ filtros.desde or '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label form-label-sm">Hasta</label>
+      <input type="date" name="hasta" id="hasta" class="form-control form-control-sm" value="{{ filtros.hasta or '' }}">
+    </div>
+    <div class="col-md-4"><button type="submit" class="btn btn-sm btn-warning">Consultar</button></div>
+  </div>
+  <div id="fechaError" class="text-danger small mt-1 d-none">La fecha "Hasta" debe ser mayor o igual a "Desde".</div>
+</form>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Producto</th><th>Presentación</th>
+          <th>Unidades vendidas</th><th>Total ₡</th><th>Facturas</th><th>% del total</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in datos %}
+        <tr>
+          <td class="fw-bold text-{{ 'warning' if loop.index == 1 else 'secondary' if loop.index == 2 else 'dark' if loop.index == 3 else 'muted' }}">
+            {% if loop.index <= 3 %}<i class="bi bi-trophy-fill"></i>{% endif %}
+            {{ loop.index }}
+          </td>
+          <td>{{ d.nombre_comercial }}</td>
+          <td>{{ d.presentacion }}</td>
+          <td>{{ d.total_unidades }}</td>
+          <td>₡{{ "{:,.2f}".format(d.monto_total or 0) }}</td>
+          <td>{{ d.num_facturas }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height:8px">
+                <div class="progress-bar bg-warning" role="progressbar" style="width:{{ d.pct_del_total or 0 }}%"></div>
+              </div>
+              <small>{{ "{:.1f}".format(d.pct_del_total or 0) }}%</small>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-muted text-center py-4">Sin datos de ventas en el período.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('frmFiltro').addEventListener('submit', function(e) {
+  const desde = document.getElementById('desde').value;
+  const hasta = document.getElementById('hasta').value;
+  const err   = document.getElementById('fechaError');
+  if (desde && hasta && hasta < desde) {
+    e.preventDefault();
+    err.classList.remove('d-none');
+  } else {
+    err.classList.add('d-none');
+  }
+});
+</script>
+{% endblock %}

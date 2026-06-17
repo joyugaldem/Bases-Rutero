@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ producto.nombre_comercial }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('productos_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">{{ producto.nombre_comercial }}</h2>
+  <span class="badge badge-estado-{{ producto.estado_producto }}">{{ producto.estado_producto }}</span>
+</div>
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Información General</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5">Categoría</dt><dd class="col-7">{{ producto.categoria }}</dd>
+          <dt class="col-5">Cód. barras</dt><dd class="col-7"><code>{{ producto.codigo_barras }}</code></dd>
+        </dl>
+        <div class="d-flex gap-2 mt-3">
+          <a href="{{ url_for('producto_editar', id=producto.id_producto) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <!-- Presentaciones -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Presentaciones</span>
+        <a href="{{ url_for('presentacion_nueva', id_producto=producto.id_producto) }}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i></a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Tamaño</th><th>Precio</th><th>Estado</th></tr></thead>
+          <tbody>
+          {% for pr in presentaciones %}
+            <tr>
+              <td>{{ pr.tamano }} {{ pr.unidad_medida }}</td>
+              <td>₡{{ "{:,.2f}".format(pr.precio_venta) }}</td>
+              <td><span class="badge badge-estado-{{ pr.estado_presentacion }}">{{ pr.estado_presentacion }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-2">Sin presentaciones.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Lotes -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Lotes</span>
+        <a href="{{ url_for('lote_nuevo', id_producto=producto.id_producto) }}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i></a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Número</th><th>Elaboración</th><th>Vencimiento</th><th>Disponible</th><th>Estado</th></tr></thead>
+          <tbody>
+          {% for l in lotes %}
+            <tr class="{{ 'table-warning' if l.dias_para_vencer is defined and l.dias_para_vencer <= 7 else '' }}">
+              <td><code>{{ l.numero_lote }}</code></td>
+              <td>{{ l.fecha_elaboracion }}</td>
+              <td>{{ l.fecha_vencimiento }}</td>
+              <td>{{ l.cantidad_disponible }}</td>
+              <td><span class="badge badge-estado-{{ l.estado_lote }}">{{ l.estado_lote }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-muted text-center py-2">Sin lotes.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Nueva Presentación{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('producto_detalle', id=producto.id_producto) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">Nueva presentación &mdash; {{ producto.nombre_comercial }}</h2>
+</div>
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    <form method="post" class="needs-validation" novalidate>
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label">Tamaño * <small class="text-muted">(ej. 500)</small></label>
+          <input type="text" name="tamano" class="form-control" placeholder="500"
+            required minlength="1" maxlength="20">
+          <div class="invalid-feedback">Ingrese el tamaño (máx. 20 caracteres).</div>
+        </div>
+        <div class="col-6">
+          <label class="form-label">Unidad *</label>
+          <select name="unidad_medida" class="form-select" required>
+            {% for u in unidades %}<option>{{ u }}</option>{% endfor %}
+          </select>
+          <div class="invalid-feedback">Seleccione una unidad.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Precio de venta (₡) *</label>
+          <input type="number" step="0.01" min="0.01" max="9999999.99"
+            name="precio_venta" class="form-control" required>
+          <div class="invalid-feedback">Ingrese un precio entre ₡0.01 y ₡9,999,999.99.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Descripción <small class="text-muted">(opcional)</small></label>
+          <input type="text" name="descripcion" class="form-control" maxlength="255">
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('producto_detalle', id=producto.id_producto) }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

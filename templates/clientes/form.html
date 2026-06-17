@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if cliente else 'Nuevo' }} Cliente{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('clientes_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">{{ 'Editar' if cliente else 'Nuevo' }} Cliente</h2>
+</div>
+<div class="card" style="max-width:600px">
+  <div class="card-body">
+    <form method="post" class="needs-validation" novalidate>
+      <div class="mb-3">
+        <label class="form-label">Nombre del contacto *</label>
+        <input type="text" name="nombre" class="form-control" required
+          minlength="2" maxlength="100"
+          value="{{ cliente.nombre if cliente else '' }}">
+        <div class="invalid-feedback">Ingrese un nombre (2–100 caracteres).</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Razón social / Nombre comercial *</label>
+        <input type="text" name="razon_social" class="form-control" required
+          minlength="2" maxlength="150"
+          value="{{ cliente.razon_social if cliente else '' }}">
+        <div class="invalid-feedback">Ingrese la razón social (2–150 caracteres).</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Dirección (provincia, cantón, distrito, señas) *</label>
+        <textarea name="direccion" class="form-control" rows="2" required
+          minlength="5" maxlength="500">{{ cliente.direccion_compuesta if cliente else '' }}</textarea>
+        <div class="invalid-feedback">Ingrese la dirección completa (5–500 caracteres).</div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Teléfono <small class="text-muted">(formato: 8765-5378)</small></label>
+          <input type="text" name="telefono" class="form-control phone-input"
+            placeholder="8765-5378" maxlength="9"
+            pattern="[0-9]{4}-[0-9]{4}"
+            title="Ingrese 8 dígitos con guion: XXXX-XXXX">
+          <div class="invalid-feedback">Formato requerido: XXXX-XXXX (8 dígitos).</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Tipo de teléfono</label>
+          <select name="tipo_telefono" class="form-select">
+            <option>Móvil</option><option>Fijo</option><option>WhatsApp</option>
+          </select>
+        </div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Ruta asignada</label>
+          <select name="id_ruta" class="form-select">
+            <option value="">— Sin ruta —</option>
+            {% for r in rutas %}
+              <option value="{{ r.id_ruta }}" {{ 'selected' if cliente and cliente.ruta_nombre == r.nombre }}>{{ r.nombre }} ({{ r.zona_geografica }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="credito" value="1" id="credito"
+              {{ 'checked' if cliente and cliente.credito_autorizado }}>
+            <label class="form-check-label" for="credito">Crédito autorizado</label>
+          </div>
+        </div>
+      </div>
+      {% if cliente %}
+      <div class="mb-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          {% for e in estados %}
+            <option {{ 'selected' if cliente.estado_cliente == e }}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('clientes_lista') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Ventas por Ruta{% endblock %}
+{% block content %}
+<h2 class="mb-3"><i class="bi bi-bar-chart me-2"></i>Ventas por Ruta de Distribución</h2>
+<form method="get" class="card card-body mb-3 p-3" id="frmFiltro">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label form-label-sm">Desde</label>
+      <input type="date" name="desde" id="desde" class="form-control form-control-sm" value="{{ filtros.desde or '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label form-label-sm">Hasta</label>
+      <input type="date" name="hasta" id="hasta" class="form-control form-control-sm" value="{{ filtros.hasta or '' }}">
+    </div>
+    <div class="col-md-4"><button type="submit" class="btn btn-sm btn-primary w-100">Generar</button></div>
+  </div>
+  <div id="fechaError" class="text-danger small mt-1 d-none">La fecha "Hasta" debe ser mayor o igual a "Desde".</div>
+</form>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light"><tr><th>Ruta</th><th>Zona</th><th>Facturas</th><th>Clientes</th><th>Total</th><th>Contado</th><th>Crédito</th><th>Promedio</th></tr></thead>
+      <tbody>
+      {% for d in datos %}
+        <tr>
+          <td>{{ d.ruta }}</td><td>{{ d.zona_geografica }}</td>
+          <td>{{ d.total_facturas }}</td><td>{{ d.clientes_unicos }}</td>
+          <td>₡{{ "{:,.2f}".format(d.monto_total or 0) }}</td>
+          <td>₡{{ "{:,.2f}".format(d.total_contado or 0) }}</td>
+          <td>₡{{ "{:,.2f}".format(d.total_credito or 0) }}</td>
+          <td>₡{{ "{:,.2f}".format(d.promedio_por_factura or 0) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-muted text-center py-4">Sin datos en el período.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('frmFiltro').addEventListener('submit', function(e) {
+  const desde = document.getElementById('desde').value;
+  const hasta = document.getElementById('hasta').value;
+  const err   = document.getElementById('fechaError');
+  if (desde && hasta && hasta < desde) {
+    e.preventDefault();
+    err.classList.remove('d-none');
+  } else {
+    err.classList.add('d-none');
+  }
+});
+</script>
+{% endblock %}

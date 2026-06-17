@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if ruta else 'Nueva' }} Ruta{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('rutas_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">{{ 'Editar' if ruta else 'Nueva' }} Ruta</h2>
+</div>
+<div class="card" style="max-width:520px">
+  <div class="card-body">
+    <form method="post" class="needs-validation" novalidate>
+      <div class="mb-3">
+        <label class="form-label">Nombre de la ruta *</label>
+        <input type="text" name="nombre" class="form-control" required
+          minlength="2" maxlength="100"
+          value="{{ ruta.nombre if ruta else '' }}">
+        <div class="invalid-feedback">Ingrese el nombre de la ruta (2–100 caracteres).</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Zona geográfica *</label>
+        <input type="text" name="zona_geografica" class="form-control" required
+          minlength="2" maxlength="100"
+          value="{{ ruta.zona_geografica if ruta else '' }}">
+        <div class="invalid-feedback">Ingrese la zona geográfica (2–100 caracteres).</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Descripción <small class="text-muted">(opcional)</small></label>
+        <textarea name="descripcion" class="form-control" rows="2"
+          maxlength="255">{{ ruta.descripcion if ruta else '' }}</textarea>
+      </div>
+      {% if ruta %}
+      <div class="mb-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          {% for e in estados %}
+            <option {{ 'selected' if ruta.estado_ruta == e }}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('rutas_lista') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

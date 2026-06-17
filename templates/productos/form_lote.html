@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Lote{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('producto_detalle', id=producto.id_producto) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">Nuevo lote &mdash; {{ producto.nombre_comercial }}</h2>
+</div>
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    <form method="post" class="needs-validation" novalidate>
+      <div class="mb-3">
+        <label class="form-label">Número de lote *</label>
+        <input type="text" name="numero_lote" id="numLote" class="form-control"
+          placeholder="LOT-YYYYMMDD-###" required minlength="1" maxlength="50">
+        <div class="invalid-feedback">Ingrese el número de lote (máx. 50 caracteres).</div>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-6">
+          <label class="form-label">Fecha elaboración *</label>
+          <input type="date" name="fecha_elaboracion" id="fechaElab" class="form-control" required>
+          <div class="invalid-feedback">Seleccione la fecha de elaboración.</div>
+        </div>
+        <div class="col-6">
+          <label class="form-label">Fecha vencimiento *</label>
+          <input type="date" name="fecha_vencimiento" id="fechaVenc" class="form-control" required>
+          <div class="invalid-feedback">La fecha de vencimiento debe ser posterior a la de elaboración.</div>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Cantidad producida *</label>
+        <input type="number" min="1" step="1" name="cantidad" class="form-control" required>
+        <div class="invalid-feedback">Ingrese una cantidad mayor a 0.</div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('producto_detalle', id=producto.id_producto) }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const fechaElab = document.getElementById('fechaElab');
+const fechaVenc = document.getElementById('fechaVenc');
+
+fechaElab.addEventListener('change', function() {
+  if (!this.value) return;
+  const min = new Date(this.value);
+  min.setDate(min.getDate() + 1);
+  fechaVenc.min = min.toISOString().split('T')[0];
+  if (fechaVenc.value && fechaVenc.value <= this.value) {
+    fechaVenc.value = '';
+  }
+});
+</script>
+{% endblock %}

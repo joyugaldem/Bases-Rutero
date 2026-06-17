@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Registrar Pago{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('factura_detalle', id=id_factura) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">Registrar Pago</h2>
+</div>
+{% if credito %}
+<div class="alert alert-warning">Saldo pendiente: <strong>₡{{ "{:,.2f}".format(credito.saldo_pendiente) }}</strong></div>
+{% endif %}
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    <form method="post" class="needs-validation" novalidate>
+      <div class="mb-3">
+        <label class="form-label">Monto del pago (₡) *</label>
+        <input type="number" step="0.01" min="0.01" name="monto" class="form-control" required
+          max="{{ credito.saldo_pendiente if credito else '' }}">
+        <div class="invalid-feedback">
+          Ingrese un monto entre ₡0.01
+          {% if credito %} y ₡{{ "{:,.2f}".format(credito.saldo_pendiente) }}{% endif %}.
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Método de pago *</label>
+        <select name="metodo_pago" class="form-select" required>
+          <option value="">Seleccionar…</option>
+          <option>Efectivo</option><option>Transferencia</option><option>SINPE</option><option>Cheque</option>
+        </select>
+        <div class="invalid-feedback">Seleccione el método de pago.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Número de comprobante <small class="text-muted">(opcional)</small></label>
+        <input type="text" name="comprobante" class="form-control" maxlength="100">
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success">Registrar pago</button>
+        <a href="{{ url_for('factura_detalle', id=id_factura) }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

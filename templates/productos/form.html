@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if producto else 'Nuevo' }} Producto{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('productos_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">{{ 'Editar' if producto else 'Nuevo' }} Producto</h2>
+</div>
+<div class="card" style="max-width:560px">
+  <div class="card-body">
+    <form method="post" class="needs-validation" novalidate>
+      <div class="mb-3">
+        <label class="form-label">Nombre comercial *</label>
+        <input type="text" name="nombre" class="form-control" required
+          minlength="2" maxlength="100"
+          value="{{ producto.nombre_comercial if producto else '' }}">
+        <div class="invalid-feedback">Ingrese el nombre del producto (2–100 caracteres).</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Código de barras * <small class="text-muted">(sin espacios)</small></label>
+        <input type="text" name="codigo_barras" class="form-control" required
+          minlength="1" maxlength="50"
+          pattern="[^ ]+"
+          title="El código de barras no puede contener espacios"
+          value="{{ producto.codigo_barras if producto else '' }}">
+        <div class="invalid-feedback">Código inválido: ingrese entre 1 y 50 caracteres sin espacios.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Categoría *</label>
+        <select name="categoria" class="form-select" required>
+          {% for c in categorias %}
+            <option value="{{ c }}" {{ 'selected' if producto and producto.categoria == c }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+        <div class="invalid-feedback">Seleccione una categoría.</div>
+      </div>
+      {% if producto %}
+      <div class="mb-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          {% for e in estados %}
+            <option value="{{ e }}" {{ 'selected' if producto.estado_producto == e }}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('productos_lista') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
