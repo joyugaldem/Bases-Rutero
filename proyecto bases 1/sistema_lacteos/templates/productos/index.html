@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Productos{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2><i class="bi bi-box-seam me-2"></i>Productos</h2>
+  <a href="{{ url_for('productos_nuevo') }}" class="btn btn-primary"><i class="bi bi-plus me-1"></i>Nuevo</a>
+</div>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Nombre</th><th>Código de barras</th><th>Categoría</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for p in productos %}
+        <tr>
+          <td><a href="{{ url_for('producto_detalle', id=p.id_producto) }}">{{ p.nombre_comercial }}</a></td>
+          <td><code>{{ p.codigo_barras }}</code></td>
+          <td>{{ p.categoria }}</td>
+          <td><span class="badge badge-estado-{{ p.estado_producto }}">{{ p.estado_producto }}</span></td>
+          <td class="text-end">
+            <a href="{{ url_for('producto_editar', id=p.id_producto) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{{ url_for('producto_eliminar', id=p.id_producto) }}" class="d-inline" onsubmit="return confirm('¿Eliminar este producto?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">Sin productos registrados.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

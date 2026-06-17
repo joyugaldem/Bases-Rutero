@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if repartidor else 'Nuevo' }} Repartidor{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('repartidores_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">{{ 'Editar' if repartidor else 'Nuevo' }} Repartidor</h2>
+</div>
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Nombre completo *</label>
+        <input type="text" name="nombre" class="form-control" required value="{{ repartidor.nombre if repartidor else '' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Licencia de conducir *</label>
+        <input type="text" name="licencia" class="form-control" required value="{{ repartidor.licencia if repartidor else '' }}">
+      </div>
+      {% if repartidor %}
+      <div class="mb-3">
+        <label class="form-label">Estado</label>
+        <select name="estado" class="form-select">
+          {% for e in estados %}
+            <option {{ 'selected' if repartidor.estado_repartidor == e }}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="{{ url_for('repartidores_lista') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

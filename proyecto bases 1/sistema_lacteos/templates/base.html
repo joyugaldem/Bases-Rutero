@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Lácteos María del Carmen{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    body { background-color: #f8f9fa; }
+    .sidebar { min-height: 100vh; background: #1a3a5c; }
+    .sidebar .nav-link { color: #c8d8e8; padding: .6rem 1.2rem; border-radius: .4rem; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { background: #2563a8; color: #fff; }
+    .sidebar .brand { color: #fff; font-size: 1.1rem; font-weight: 700; padding: 1rem 1.2rem; border-bottom: 1px solid #2563a8; }
+    .sidebar .section-title { font-size: .7rem; text-transform: uppercase; color: #7a99bb; padding: .8rem 1.2rem .2rem; letter-spacing: .1em; }
+    .content { padding: 1.5rem; }
+    .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .badge-estado-Activo, .badge-estado-Activa, .badge-estado-Pagada, .badge-estado-Disponible { background-color: #198754 !important; }
+    .badge-estado-Inactivo, .badge-estado-Inactiva, .badge-estado-Descontinuado { background-color: #6c757d !important; }
+    .badge-estado-Suspendido, .badge-estado-Suspendida, .badge-estado-Anulada, .badge-estado-Vencido { background-color: #dc3545 !important; }
+    .badge-estado-Pendiente, .badge-estado-En\ curso { background-color: #fd7e14 !important; }
+    .badge-estado-Completado { background-color: #0d6efd !important; }
+  </style>
+</head>
+<body>
+<div class="d-flex">
+  <!-- Sidebar -->
+  <nav class="sidebar d-flex flex-column" style="width:230px;min-width:230px;">
+    <div class="brand"><i class="bi bi-droplet-half me-2"></i>Lácteos M.C.</div>
+    <div class="section-title">Principal</div>
+    <a href="{{ url_for('index') }}" class="nav-link"><i class="bi bi-house me-2"></i>Inicio</a>
+    <div class="section-title">Catálogo</div>
+    <a href="{{ url_for('productos_lista') }}" class="nav-link"><i class="bi bi-box-seam me-2"></i>Productos</a>
+    <div class="section-title">Clientes</div>
+    <a href="{{ url_for('clientes_lista') }}" class="nav-link"><i class="bi bi-people me-2"></i>Clientes</a>
+    <div class="section-title">Distribución</div>
+    <a href="{{ url_for('rutas_lista') }}" class="nav-link"><i class="bi bi-map me-2"></i>Rutas</a>
+    <a href="{{ url_for('repartidores_lista') }}" class="nav-link"><i class="bi bi-truck me-2"></i>Repartidores</a>
+    <a href="{{ url_for('recorrido_nuevo') }}" class="nav-link"><i class="bi bi-calendar-plus me-2"></i>Nuevo Recorrido</a>
+    <div class="section-title">Facturación</div>
+    <a href="{{ url_for('facturacion_lista') }}" class="nav-link"><i class="bi bi-receipt me-2"></i>Facturas</a>
+    <a href="{{ url_for('factura_nueva') }}" class="nav-link"><i class="bi bi-plus-circle me-2"></i>Nueva Factura</a>
+    <div class="section-title">Reportes</div>
+    <a href="{{ url_for('rpt_ventas_ruta') }}" class="nav-link"><i class="bi bi-bar-chart me-2"></i>Ventas por Ruta</a>
+    <a href="{{ url_for('rpt_creditos') }}" class="nav-link"><i class="bi bi-credit-card me-2"></i>Créditos</a>
+    <a href="{{ url_for('rpt_productos_vencer') }}" class="nav-link"><i class="bi bi-exclamation-triangle me-2"></i>Por Vencer</a>
+    <a href="{{ url_for('rpt_top_productos') }}" class="nav-link"><i class="bi bi-trophy me-2"></i>Top Productos</a>
+  </nav>
+
+  <!-- Main content -->
+  <main class="content flex-grow-1">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+          {{ msg }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

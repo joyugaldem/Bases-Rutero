@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Recorrido{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('rutas_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">Iniciar Recorrido</h2>
+</div>
+<div class="card" style="max-width:480px">
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Ruta *</label>
+        <select name="id_ruta" class="form-select" required>
+          <option value="">Seleccionar…</option>
+          {% for r in rutas %}<option value="{{ r.id_ruta }}">{{ r.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Repartidor *</label>
+        <select name="id_repartidor" class="form-select" required>
+          <option value="">Seleccionar…</option>
+          {% for r in repartidores %}<option value="{{ r.id_repartidor }}">{{ r.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-6">
+          <label class="form-label">Fecha</label>
+          <input type="date" name="fecha" class="form-control">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Turno *</label>
+          <select name="turno" class="form-select">
+            <option>Mañana</option><option>Tarde</option><option>Noche</option>
+          </select>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Crear recorrido</button>
+        <a href="{{ url_for('rutas_lista') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

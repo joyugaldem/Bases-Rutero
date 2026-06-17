@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ ruta.nombre }}{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3 gap-2">
+  <a href="{{ url_for('rutas_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+  <h2 class="mb-0">{{ ruta.nombre }}</h2>
+  <span class="badge badge-estado-{{ ruta.estado_ruta }}">{{ ruta.estado_ruta }}</span>
+</div>
+<p class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ ruta.zona_geografica }}{% if ruta.descripcion %} &mdash; {{ ruta.descripcion }}{% endif %}</p>
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center fw-semibold">
+        Repartidores asignados
+        <a href="{{ url_for('recorrido_nuevo') }}" class="btn btn-sm btn-primary">+ Recorrido</a>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Repartidor</th><th>Desde</th><th>Hasta</th></tr></thead>
+          <tbody>
+          {% for a in asignaciones %}
+            <tr><td>{{ a.repartidor }}</td><td>{{ a.fecha_inicio }}</td><td>{{ a.fecha_fin or 'Vigente' }}</td></tr>
+          {% else %}
+            <tr><td colspan="3" class="text-muted text-center py-2">Sin asignaciones.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header fw-semibold">Recorridos recientes</div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Fecha</th><th>Repartidor</th><th>Turno</th><th>Estado</th></tr></thead>
+          <tbody>
+          {% for r in recorridos %}
+            <tr>
+              <td>{{ r.fecha }}</td><td>{{ r.repartidor }}</td><td>{{ r.turno }}</td>
+              <td><span class="badge badge-estado-{{ r.estado_recorrido }}">{{ r.estado_recorrido }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="text-muted text-center py-2">Sin recorridos.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
