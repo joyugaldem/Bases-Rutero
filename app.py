@@ -5,6 +5,7 @@ Módulos: Productos, Clientes, Rutas/Repartidores, Facturación
 """
 
 from flask import Flask, render_template, redirect, url_for, request, flash
+import os
 import config
 from db import get_db, close_db, call_proc, call_proc_out, query
 
@@ -527,4 +528,4 @@ def rpt_top_productos():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
