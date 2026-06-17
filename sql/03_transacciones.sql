@@ -151,28 +151,19 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'monto_excede_saldo';
     END IF;
 
-    -- Registrar pago
+    -- Registrar pago (trg_pago_after_insert actualiza saldo y estado automáticamente)
     INSERT INTO pago (id_factura_credito, monto, metodo_pago, numero_comprobante)
     VALUES (p_id_factura_credito, p_monto, p_metodo_pago, p_comprobante);
     SET p_id_pago = LAST_INSERT_ID();
 
-    -- Actualizar saldo pendiente
-    UPDATE factura_credito
-    SET saldo_pendiente = saldo_pendiente - p_monto
-    WHERE id_factura = p_id_factura_credito;
-
-    SET p_saldo_restante = v_saldo_actual - p_monto;
-
-    -- Marcar factura como pagada si saldo llega a 0
-    IF p_saldo_restante = 0 THEN
-        UPDATE factura SET estado_factura = 'Pagada'
-        WHERE id_factura = p_id_factura_credito;
-    END IF;
+    -- Leer saldo actualizado por el trigger
+    SELECT saldo_pendiente INTO p_saldo_restante
+    FROM factura_credito WHERE id_factura = p_id_factura_credito;
 
     COMMIT;
     SET p_mensaje = IF(p_saldo_restante = 0,
         'Pago registrado. Factura cancelada por completo.',
-        CONCAT('Pago registrado. Saldo restante: ', p_saldo_restante));
+        CONCAT('Pago registrado. Saldo restante: ₡', FORMAT(p_saldo_restante, 2)));
 END //
 
 -- ============================================================
