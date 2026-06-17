@@ -69,14 +69,14 @@ def call_proc_out(proc_name, args):
     args debe ser una lista mutable.
     """
     conn = get_db()
-    cur = conn.cursor(dictionary=True)
-    out = cur.callproc(proc_name, args)
+    cur = conn.cursor()
+    out_args = cur.callproc(proc_name, args)
     results = []
     for rs in cur.stored_results():
         results.append(rs.fetchall())
     conn.commit()
     cur.close()
-    return results, list(out)
+    return results, list(out_args)
 
 
 def execute(sql, params=None):

@@ -33,30 +33,24 @@ def strip_comments(sql):
 def split_statements(filename, content):
     """
     Divide el contenido de un archivo .sql en sentencias ejecutables.
-    - Archivos con DELIMITER //: divide por '//' en lineas propias.
-    - Archivos normales: divide por ';' a nivel de tokens.
+    - Archivos con DELIMITER //: split por '//' (cada bloque es un statement).
+    - Archivos normales: split por ';' a nivel de tokens.
     Retorna lista de strings no vacios.
     """
     name = os.path.basename(filename)
 
-    content = re.sub(r"DELIMITER\s+//.*?(?=DELIMITER\s+;|$)", "", content, flags=re.DOTALL)
-    content = re.sub(r"DELIMITER\s+;", "", content)
-
     if name in DELIMITER_FILES:
+        parts = content.split("//")
         statements = []
-        current = []
-        for line in content.splitlines():
-            l = line.strip()
-            if l.endswith("//"):
-                current.append(l[:-2].strip())
-                stmt = " ".join(current)
-                if stmt:
-                    statements.append(stmt)
-                current = []
-            else:
-                current.append(l)
-        if current:
-            stmt = " ".join(current).strip()
+        for part in parts:
+            lines = part.splitlines()
+            cleaned_lines = []
+            for line in lines:
+                l = line.strip()
+                if l.upper().startswith("DELIMITER"):
+                    continue
+                cleaned_lines.append(line)
+            stmt = "\n".join(cleaned_lines).strip()
             if stmt:
                 statements.append(stmt)
         return statements
@@ -152,6 +146,13 @@ def run_bootstrap():
                 continue
             try:
                 cur.execute(stmt)
+                while True:
+                    try:
+                        cur.fetchall()
+                    except mysql.connector.Error:
+                        pass
+                    if not cur.nextset():
+                        break
                 conn.commit()
                 ok += 1
             except mysql.connector.Error as e:
