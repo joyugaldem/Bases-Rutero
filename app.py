@@ -241,7 +241,7 @@ def cliente_editar(id):
 def cliente_eliminar(id):
     try:
         call_proc("sp_eliminar_cliente", [id])
-        flash("Cliente desactivado.", "info")
+        flash("Cliente eliminado.", "info")
     except Exception as e:
         flash(f"Error: {e}", "danger")
     return redirect(url_for("clientes_lista"))

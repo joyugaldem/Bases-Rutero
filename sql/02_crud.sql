@@ -191,8 +191,12 @@ END //
 DROP PROCEDURE IF EXISTS sp_eliminar_cliente //
 CREATE PROCEDURE sp_eliminar_cliente(IN p_id_cliente INT)
 BEGIN
-    -- Borrado lógico para preservar historial de ventas (RNF-04)
-    UPDATE cliente SET estado_cliente = 'Inactivo' WHERE id_cliente = p_id_cliente;
+    -- Borrado físico si no tiene facturas; lógico si las tiene (RNF-04)
+    IF EXISTS (SELECT 1 FROM factura WHERE id_cliente = p_id_cliente LIMIT 1) THEN
+        UPDATE cliente SET estado_cliente = 'Inactivo' WHERE id_cliente = p_id_cliente;
+    ELSE
+        DELETE FROM cliente WHERE id_cliente = p_id_cliente;
+    END IF;
 END //
 
 DROP PROCEDURE IF EXISTS sp_consultar_clientes //
