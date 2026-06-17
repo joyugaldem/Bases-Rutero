@@ -16,8 +16,13 @@
         </div>
         <p class="text-muted small mb-2"><i class="bi bi-geo-alt me-1"></i>{{ r.zona_geografica }}</p>
         {% if r.descripcion %}<p class="card-text small">{{ r.descripcion }}</p>{% endif %}
-        <a href="{{ url_for('ruta_detalle', id=r.id_ruta) }}" class="btn btn-sm btn-outline-primary">Ver detalle</a>
-        <a href="{{ url_for('ruta_editar', id=r.id_ruta) }}" class="btn btn-sm btn-outline-secondary">Editar</a>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ url_for('ruta_detalle', id=r.id_ruta) }}" class="btn btn-sm btn-outline-primary">Ver detalle</a>
+          <a href="{{ url_for('ruta_editar', id=r.id_ruta) }}" class="btn btn-sm btn-outline-secondary">Editar</a>
+          <form method="post" action="{{ url_for('ruta_eliminar', id=r.id_ruta) }}" onsubmit="return confirm('¿Eliminar esta ruta?')">
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
       </div>
     </div>
   </div>

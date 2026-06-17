@@ -18,7 +18,12 @@
           <dt class="col-5">Crédito</dt><dd class="col-7">{% if cliente.credito_autorizado %}<span class="badge bg-success">Autorizado</span>{% else %}<span class="badge bg-secondary">No</span>{% endif %}</dd>
           <dt class="col-5">Dirección</dt><dd class="col-7 small">{{ cliente.direccion_compuesta }}</dd>
         </dl>
-        <a href="{{ url_for('cliente_editar', id=cliente.id_cliente) }}" class="btn btn-sm btn-outline-secondary mt-2">Editar</a>
+        <div class="d-flex gap-2 mt-2">
+          <a href="{{ url_for('cliente_editar', id=cliente.id_cliente) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
+          <form method="post" action="{{ url_for('cliente_eliminar', id=cliente.id_cliente) }}" onsubmit="return confirm('¿Eliminar este cliente?')">
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar</button>
+          </form>
+        </div>
       </div>
     </div>
     <div class="card">

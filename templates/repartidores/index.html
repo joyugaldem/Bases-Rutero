@@ -17,6 +17,9 @@
           <td><span class="badge badge-estado-{{ r.estado_repartidor }}">{{ r.estado_repartidor }}</span></td>
           <td class="text-end">
             <a href="{{ url_for('repartidor_editar', id=r.id_repartidor) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+            <form method="post" action="{{ url_for('repartidor_eliminar', id=r.id_repartidor) }}" class="d-inline" onsubmit="return confirm('¿Eliminar este repartidor?')">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
           </td>
         </tr>
       {% else %}

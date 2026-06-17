@@ -310,6 +310,16 @@ def ruta_editar(id):
                            estados=estados)
 
 
+@app.route("/rutas/<int:id>/eliminar", methods=["POST"])
+def ruta_eliminar(id):
+    try:
+        call_proc("sp_eliminar_ruta", [id])
+        flash("Ruta eliminada.", "info")
+    except Exception as e:
+        flash(f"Error: {e}", "danger")
+    return redirect(url_for("rutas_lista"))
+
+
 # --- Recorridos ---
 
 @app.route("/recorridos/nuevo", methods=["GET", "POST"])
@@ -378,6 +388,16 @@ def repartidor_editar(id):
     return render_template("repartidores/form.html",
                            repartidor=rows[0][0] if rows and rows[0] else None,
                            estados=estados)
+
+
+@app.route("/repartidores/<int:id>/eliminar", methods=["POST"])
+def repartidor_eliminar(id):
+    try:
+        call_proc("sp_eliminar_repartidor", [id])
+        flash("Repartidor eliminado.", "info")
+    except Exception as e:
+        flash(f"Error: {e}", "danger")
+    return redirect(url_for("repartidores_lista"))
 
 
 # ============================================================

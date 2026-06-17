@@ -5,6 +5,10 @@
   <a href="{{ url_for('rutas_lista') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
   <h2 class="mb-0">{{ ruta.nombre }}</h2>
   <span class="badge badge-estado-{{ ruta.estado_ruta }}">{{ ruta.estado_ruta }}</span>
+  <a href="{{ url_for('ruta_editar', id=ruta.id_ruta) }}" class="btn btn-sm btn-outline-secondary ms-2"><i class="bi bi-pencil me-1"></i>Editar</a>
+  <form method="post" action="{{ url_for('ruta_eliminar', id=ruta.id_ruta) }}" class="d-inline" onsubmit="return confirm('¿Eliminar esta ruta?')">
+    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar</button>
+  </form>
 </div>
 <p class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ ruta.zona_geografica }}{% if ruta.descripcion %} &mdash; {{ ruta.descripcion }}{% endif %}</p>
 <div class="row g-3">
