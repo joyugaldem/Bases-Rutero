@@ -39,13 +39,19 @@ def close_db(e=None):
         db.close()
 
 
-def query(sql, params=None, fetchone=False):
-    """Ejecuta una consulta SELECT y retorna los resultados como lista de dicts."""
+def query(sql, params=None, fetchone=False, default=None):
+    """Ejecuta una consulta SELECT y retorna los resultados como lista de dicts.
+
+    Si fetchone=True y no hay filas, retorna `default` (None por defecto) en
+    lugar de propagar la excepción o devolver un dict vacío.
+    """
     conn = get_db()
     cur = conn.cursor(dictionary=True)
     cur.execute(sql, params or ())
     rows = cur.fetchone() if fetchone else cur.fetchall()
     cur.close()
+    if rows is None:
+        return default
     return rows
 
 
@@ -86,6 +92,23 @@ def call_proc_out(proc_name, args):
         conn.rollback()
         cur.close()
         raise
+
+
+def call_proc_named(proc_name, in_args, out_names):
+    """
+    Llama un stored procedure con IN args conocidos y OUT params nombrados.
+
+    in_args:    lista de valores para parámetros IN (en orden).
+    out_names:  lista de nombres simbólicos para los OUT (en orden).
+
+    Retorna (results, dict) donde dict mapea cada out_name a su valor
+    retornado por el SP. Útil para evitar acceso por índice posicional
+    frágil (out[10], out[12], etc.).
+    """
+    full_args = list(in_args) + [None] * len(out_names)
+    results, out_args = call_proc_out(proc_name, full_args)
+    out_values = out_args[len(in_args):]
+    return results, dict(zip(out_names, out_values))
 
 
 def execute(sql, params=None):
