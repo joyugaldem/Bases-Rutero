@@ -2,6 +2,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytest
 import mysql.connector
 
 
@@ -11,24 +12,24 @@ class TestSpInsertarCliente:
     def test_inserta_cliente_nuevo(self, mysql_connection, clean_db):
         """Inserta persona + cliente y retorna id_cliente válido."""
         cur = mysql_connection.cursor()
-        args = ["Juan Pérez Test", "JP Test SA", "San José", False, None, None]
+        args = ["Juan Pérez Test", "JP Test SA", "San José", False, None, None, None]
         cur.callproc("sp_insertar_cliente", args)
         for rs in cur.stored_results():
             rs.fetchall()
         mysql_connection.commit()
         out = list(cur.callproc("sp_insertar_cliente", args))
-        id_cliente = out[0][5]
+        id_cliente = out[5]
         assert id_cliente is not None
         assert id_cliente > 0
 
     def test_inserta_cliente_con_credito(self, mysql_connection, clean_db):
         """Inserta cliente con crédito autorizado."""
         cur = mysql_connection.cursor()
-        args = ["María López", "ML SA", "Cartago", True, None, None]
+        args = ["María López", "ML SA", "Cartago", True, None, None, None]
         cur.callproc("sp_insertar_cliente", args)
         mysql_connection.commit()
         out = list(cur.callproc("sp_insertar_cliente", args))
-        id_cliente = out[0][5]
+        id_cliente = out[5]
         cur.execute(
             "SELECT credito_autorizado FROM cliente WHERE id_cliente = %s",
             (id_cliente,)
@@ -48,7 +49,7 @@ class TestSpInsertarCliente:
 
         try:
             cur.callproc("sp_insertar_cliente", [
-                "Juan", "Razón", "Dirección", False, None, None
+                "Juan", "Razón", "Dirección", False, None, None, None
             ])
             mysql_connection.commit()
         except Exception:
@@ -177,7 +178,7 @@ class TestSpTrxRegistrarPago:
         mysql_connection.commit()
         out = list(cur.callproc("sp_trx_registrar_pago", args))
 
-        saldo = out[0][1]
+        saldo = out[5]
         assert saldo == 500.00
 
         cur.execute("SELECT estado_factura FROM factura WHERE id_factura = %s", (id_factura,))
