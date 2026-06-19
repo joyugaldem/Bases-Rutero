@@ -4,7 +4,9 @@ Productos Lácteos María del Carmen
 Módulos: Productos, Clientes, Rutas/Repartidores, Facturación
 """
 
+import functools
 from flask import Flask, render_template, redirect, url_for, request, flash
+from werkzeug.exceptions import BadRequestKeyError
 import os
 import config
 from db import get_db, close_db, call_proc, call_proc_named, query
@@ -19,6 +21,46 @@ app.teardown_appcontext(close_db)
 def inject_globals():
     """Inyecta constantes del módulo constants a todos los templates."""
     return {"constants": constants}
+
+
+def form_get(key, cast=str, default=None):
+    """Lee y castea un valor de request.form de forma segura.
+
+    - Devuelve `default` si el campo está vacío o ausente.
+    - Lanza `ValueError` con mensaje descriptivo si el cast falla.
+    - Hace strip() antes de castear (tolera espacios accidentales).
+    """
+    raw = request.form.get(key, "")
+    if raw is None:
+        raw = ""
+    val = raw.strip()
+    if not val:
+        return default
+    try:
+        return cast(val)
+    except (ValueError, TypeError):
+        raise ValueError(f"campo '{key}' con valor inválido: {val!r}")
+
+
+def handle_form_errors(view):
+    """Decorator que captura errores de parseo de formulario.
+
+    Convierte ValueError (de form_get) y BadRequestKeyError (de
+    request.form[]) en un flash y un redirect a la página anterior
+    (o al index) en lugar de un 500.
+    """
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        try:
+            return view(*args, **kwargs)
+        except ValueError as e:
+            flash(f"Error en formulario: {e}", "danger")
+            return redirect(request.referrer or url_for("index"))
+        except BadRequestKeyError as e:
+            key = e.args[0] if e.args else "desconocido"
+            flash(f"Campo requerido ausente: '{key}'", "danger")
+            return redirect(request.referrer or url_for("index"))
+    return wrapper
 
 
 def flash_out(out, fallback_danger="Error desconocido."):
@@ -128,6 +170,7 @@ def producto_eliminar(id):
 # --- Presentaciones ---
 
 @app.route("/presentaciones/nueva/<int:id_producto>", methods=["GET", "POST"])
+@handle_form_errors
 def presentacion_nueva(id_producto):
     if request.method == "POST":
         try:
@@ -137,7 +180,7 @@ def presentacion_nueva(id_producto):
                     id_producto,
                     request.form["tamano"],
                     request.form["unidad_medida"],
-                    float(request.form["precio_venta"]),
+                    form_get("precio_venta", float),
                     request.form.get("descripcion") or None,
                 ],
                 constants.SP_OUT["sp_insertar_presentacion"],
@@ -156,6 +199,7 @@ def presentacion_nueva(id_producto):
 # --- Lotes ---
 
 @app.route("/lotes/nuevo/<int:id_producto>", methods=["GET", "POST"])
+@handle_form_errors
 def lote_nuevo(id_producto):
     if request.method == "POST":
         try:
@@ -166,7 +210,7 @@ def lote_nuevo(id_producto):
                     request.form["numero_lote"],
                     request.form["fecha_elaboracion"],
                     request.form["fecha_vencimiento"],
-                    int(request.form["cantidad"]),
+                    form_get("cantidad", int),
                 ],
                 constants.SP_OUT["sp_insertar_lote"],
             )
@@ -353,14 +397,16 @@ def ruta_eliminar(id):
 # --- Recorridos ---
 
 @app.route("/recorridos/nuevo", methods=["GET", "POST"])
+@handle_form_errors
 def recorrido_nuevo():
     if request.method == "POST":
         try:
+            id_ruta = form_get("id_ruta", int)
             _, out = call_proc_named(
                 "sp_trx_crear_recorrido",
                 [
-                    int(request.form["id_ruta"]),
-                    int(request.form["id_repartidor"]),
+                    id_ruta,
+                    form_get("id_repartidor", int),
                     request.form["fecha"] or None,
                     request.form["turno"],
                 ],
@@ -368,7 +414,7 @@ def recorrido_nuevo():
             )
             flash_out(out, fallback_danger="Error al crear recorrido.")
             if out.get("id_recorrido"):
-                return redirect(url_for("ruta_detalle", id=request.form["id_ruta"]))
+                return redirect(url_for("ruta_detalle", id=id_ruta))
         except Exception as e:
             flash(f"Error: {e}", "danger")
     rutas       = call_proc("sp_consultar_rutas", [None])
@@ -451,19 +497,20 @@ def facturacion_lista():
 
 
 @app.route("/facturacion/nueva", methods=["GET", "POST"])
+@handle_form_errors
 def factura_nueva():
     if request.method == "POST":
         try:
-            id_cliente    = int(request.form["id_cliente"])
-            id_repartidor = int(request.form["id_repartidor"])
-            id_recorrido  = int(request.form["id_recorrido"])
-            condicion     = request.form["condicion_pago"]
-            id_presentacion = int(request.form["id_presentacion"])
-            id_lote       = int(request.form["id_lote"])
-            cantidad      = int(request.form["cantidad"])
-            monto_rec     = float(request.form.get("monto_recibido") or 0)
-            fecha_venc    = request.form.get("fecha_vencimiento_credito") or None
-            limite_cred   = float(request.form.get("limite_credito") or 0)
+            id_cliente      = form_get("id_cliente", int)
+            id_repartidor   = form_get("id_repartidor", int)
+            id_recorrido    = form_get("id_recorrido", int)
+            condicion       = request.form["condicion_pago"]
+            id_presentacion = form_get("id_presentacion", int)
+            id_lote         = form_get("id_lote", int)
+            cantidad        = form_get("cantidad", int)
+            monto_rec       = form_get("monto_recibido", float, default=0)
+            fecha_venc      = request.form.get("fecha_vencimiento_credito") or None
+            limite_cred     = form_get("limite_credito", float, default=0)
 
             _, out = call_proc_named(
                 "sp_trx_crear_factura_completa",
@@ -511,6 +558,7 @@ def factura_detalle(id):
 
 
 @app.route("/facturacion/<int:id>/pagar", methods=["GET", "POST"])
+@handle_form_errors
 def factura_pagar(id):
     if request.method == "POST":
         try:
@@ -518,7 +566,7 @@ def factura_pagar(id):
                 "sp_trx_registrar_pago",
                 [
                     id,
-                    float(request.form["monto"]),
+                    form_get("monto", float),
                     request.form["metodo_pago"],
                     request.form.get("comprobante") or None,
                 ],
