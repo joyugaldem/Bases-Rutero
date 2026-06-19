@@ -7,7 +7,8 @@ Módulos: Productos, Clientes, Rutas/Repartidores, Facturación
 from flask import Flask, render_template, redirect, url_for, request, flash
 import os
 import config
-from db import get_db, close_db, call_proc, call_proc_out, query
+from db import get_db, close_db, call_proc, call_proc_named, query
+import constants
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
@@ -20,6 +21,25 @@ def form_required(*keys):
         raise ValueError(f"Campos requeridos faltantes: {', '.join(missing)}")
     return [request.form[k].strip() for k in keys]
 
+
+def form_get(key, cast=str, default=None):
+    val = request.form.get(key, "").strip()
+    if not val:
+        return default
+    try:
+        return cast(val)
+    except (ValueError, TypeError):
+        raise ValueError(f"Campo '{key}' con valor inválido: {val!r}")
+
+
+def flash_out(out, fallback_danger="Error desconocido."):
+    """Flashea el mensaje OUT de un SP. Reconoce prefijo OK: para éxito."""
+    msg = (out.get("mensaje") if isinstance(out, dict) else None) or fallback_danger
+    if isinstance(msg, str) and msg.startswith(constants.SUCCESS_PREFIX):
+        flash(msg[len(constants.SUCCESS_PREFIX):], "success")
+    else:
+        flash(msg, "danger")
+
 # ============================================================
 # INICIO
 # ============================================================
@@ -27,15 +47,18 @@ def form_required(*keys):
 @app.route("/")
 def index():
     """Página de inicio con resumen del sistema."""
+    empty = {"productos": 0, "clientes": 0, "rutas": 0, "pendientes": 0}
     try:
-        stats = {
-            "productos":   query("SELECT COUNT(*) AS n FROM producto WHERE estado_producto='Activo'", fetchone=True)["n"],
-            "clientes":    query("SELECT COUNT(*) AS n FROM cliente WHERE estado_cliente='Activo'", fetchone=True)["n"],
-            "rutas":       query("SELECT COUNT(*) AS n FROM ruta WHERE estado_ruta='Activa'", fetchone=True)["n"],
-            "pendientes":  query("SELECT COUNT(*) AS n FROM vista_facturas_pendientes", fetchone=True)["n"],
-        }
+        row = query("""
+            SELECT
+              (SELECT COUNT(*) FROM producto  WHERE estado_producto='Activo') AS productos,
+              (SELECT COUNT(*) FROM cliente   WHERE estado_cliente='Activo')  AS clientes,
+              (SELECT COUNT(*) FROM ruta      WHERE estado_ruta='Activa')     AS rutas,
+              (SELECT COUNT(*) FROM vista_facturas_pendientes)                AS pendientes
+        """, fetchone=True, default=empty)
+        stats = row if row else empty
     except Exception:
-        stats = {"productos": 0, "clientes": 0, "rutas": 0, "pendientes": 0}
+        stats = empty
     return render_template("index.html", stats=stats)
 
 
@@ -52,13 +75,14 @@ def productos_lista():
 @app.route("/productos/nuevo", methods=["GET", "POST"])
 def productos_nuevo():
     if request.method == "POST":
-        nombre  = request.form["nombre"]
-        barras  = request.form["codigo_barras"]
-        categ   = request.form["categoria"]
         try:
-            _, out = call_proc_out("sp_insertar_producto", [nombre, barras, categ, None])
+            _, out = call_proc_named(
+                "sp_insertar_producto",
+                [request.form["nombre"], request.form["codigo_barras"], request.form["categoria"]],
+                constants.SP_OUT["sp_insertar_producto"],
+            )
             flash("Producto registrado correctamente.", "success")
-            return redirect(url_for("producto_detalle", id=out[3]))
+            return redirect(url_for("producto_detalle", id=out["id_producto"]))
         except Exception as e:
             flash(f"Error al registrar producto: {e}", "danger")
     categorias = ["Leche","Queso","Natilla","Crema","Cuajada","Yogurt","Otro"]
@@ -118,14 +142,17 @@ def producto_eliminar(id):
 def presentacion_nueva(id_producto):
     if request.method == "POST":
         try:
-            call_proc_out("sp_insertar_presentacion", [
-                id_producto,
-                request.form["tamano"],
-                request.form["unidad_medida"],
-                float(request.form["precio_venta"]),
-                request.form.get("descripcion") or None,
-                None
-            ])
+            call_proc_named(
+                "sp_insertar_presentacion",
+                [
+                    id_producto,
+                    request.form["tamano"],
+                    request.form["unidad_medida"],
+                    float(request.form["precio_venta"]),
+                    request.form.get("descripcion") or None,
+                ],
+                constants.SP_OUT["sp_insertar_presentacion"],
+            )
             flash("Presentación registrada.", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
@@ -143,14 +170,17 @@ def presentacion_nueva(id_producto):
 def lote_nuevo(id_producto):
     if request.method == "POST":
         try:
-            call_proc_out("sp_insertar_lote", [
-                id_producto,
-                request.form["numero_lote"],
-                request.form["fecha_elaboracion"],
-                request.form["fecha_vencimiento"],
-                int(request.form["cantidad"]),
-                None
-            ])
+            call_proc_named(
+                "sp_insertar_lote",
+                [
+                    id_producto,
+                    request.form["numero_lote"],
+                    request.form["fecha_elaboracion"],
+                    request.form["fecha_vencimiento"],
+                    int(request.form["cantidad"]),
+                ],
+                constants.SP_OUT["sp_insertar_lote"],
+            )
             flash("Lote registrado.", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
@@ -174,20 +204,21 @@ def clientes_lista():
 def cliente_nuevo():
     if request.method == "POST":
         try:
-            _, out = call_proc_out("sp_insertar_cliente", [
-                request.form["nombre"],
-                request.form["razon_social"],
-                request.form["direccion"],
-                request.form.get("credito") == "1",
-                request.form.get("id_ruta") or None,
-                None
-            ])
-            # Registrar teléfonos
+            _, out = call_proc_named(
+                "sp_insertar_cliente",
+                [
+                    request.form["nombre"],
+                    request.form["razon_social"],
+                    request.form["direccion"],
+                    request.form.get("credito") == "1",
+                    request.form.get("id_ruta") or None,
+                ],
+                constants.SP_OUT["sp_insertar_cliente"],
+            )
             tel = request.form.get("telefono", "").strip()
-            if tel:
+            if tel and out.get("id_persona"):
                 call_proc("sp_insertar_telefono", [
-                    query("SELECT id_persona FROM cliente WHERE id_cliente=%s",
-                          [out[5]], fetchone=True)["id_persona"],
+                    out["id_persona"],
                     tel,
                     request.form.get("tipo_telefono", "Móvil")
                 ])
@@ -268,12 +299,15 @@ def rutas_lista():
 def ruta_nueva():
     if request.method == "POST":
         try:
-            call_proc_out("sp_insertar_ruta", [
-                request.form["nombre"],
-                request.form["zona_geografica"],
-                request.form.get("descripcion") or None,
-                None
-            ])
+            call_proc_named(
+                "sp_insertar_ruta",
+                [
+                    request.form["nombre"],
+                    request.form["zona_geografica"],
+                    request.form.get("descripcion") or None,
+                ],
+                constants.SP_OUT["sp_insertar_ruta"],
+            )
             flash("Ruta registrada.", "success")
             return redirect(url_for("rutas_lista"))
         except Exception as e:
@@ -333,16 +367,19 @@ def ruta_eliminar(id):
 def recorrido_nuevo():
     if request.method == "POST":
         try:
-            _, out = call_proc_out("sp_trx_crear_recorrido", [
-                int(request.form["id_ruta"]),
-                int(request.form["id_repartidor"]),
-                request.form["fecha"] or None,
-                request.form["turno"],
-                None,
-                None
-            ])
-            flash(out[5], "success")
-            return redirect(url_for("ruta_detalle", id=request.form["id_ruta"]))
+            _, out = call_proc_named(
+                "sp_trx_crear_recorrido",
+                [
+                    int(request.form["id_ruta"]),
+                    int(request.form["id_repartidor"]),
+                    request.form["fecha"] or None,
+                    request.form["turno"],
+                ],
+                constants.SP_OUT["sp_trx_crear_recorrido"],
+            )
+            flash_out(out, fallback_danger="Error al crear recorrido.")
+            if out.get("id_recorrido"):
+                return redirect(url_for("ruta_detalle", id=request.form["id_ruta"]))
         except Exception as e:
             flash(f"Error: {e}", "danger")
     rutas       = call_proc("sp_consultar_rutas", [None])
@@ -364,11 +401,11 @@ def repartidores_lista():
 def repartidor_nuevo():
     if request.method == "POST":
         try:
-            call_proc_out("sp_insertar_repartidor", [
-                request.form["nombre"],
-                request.form["licencia"],
-                None
-            ])
+            call_proc_named(
+                "sp_insertar_repartidor",
+                [request.form["nombre"], request.form["licencia"]],
+                constants.SP_OUT["sp_insertar_repartidor"],
+            )
             flash("Repartidor registrado.", "success")
             return redirect(url_for("repartidores_lista"))
         except Exception as e:
@@ -439,20 +476,20 @@ def factura_nueva():
             fecha_venc    = request.form.get("fecha_vencimiento_credito") or None
             limite_cred   = float(request.form.get("limite_credito") or 0)
 
-            _, out = call_proc_out("sp_trx_crear_factura_completa", [
-                id_cliente, id_repartidor, id_recorrido, condicion,
-                id_presentacion, id_lote, cantidad,
-                monto_rec if condicion == "Contado" else None,
-                fecha_venc if condicion == "Crédito" else None,
-                limite_cred if condicion == "Crédito" else None,
-                None, None, None
-            ])
-            msg = out[12]
-            if "exitosamente" in (msg or ""):
-                flash(msg, "success")
-                return redirect(url_for("factura_detalle", id=out[10]))
-            else:
-                flash(msg or "Error desconocido.", "danger")
+            _, out = call_proc_named(
+                "sp_trx_crear_factura_completa",
+                [
+                    id_cliente, id_repartidor, id_recorrido, condicion,
+                    id_presentacion, id_lote, cantidad,
+                    monto_rec if condicion == "Contado" else None,
+                    fecha_venc if condicion == "Crédito" else None,
+                    limite_cred if condicion == "Crédito" else None,
+                ],
+                constants.SP_OUT["sp_trx_crear_factura_completa"],
+            )
+            flash_out(out, fallback_danger="Error desconocido al crear factura.")
+            if out.get("id_factura"):
+                return redirect(url_for("factura_detalle", id=out["id_factura"]))
         except Exception as e:
             flash(f"Error al crear factura: {e}", "danger")
 
@@ -488,15 +525,17 @@ def factura_detalle(id):
 def factura_pagar(id):
     if request.method == "POST":
         try:
-            _, out = call_proc_out("sp_trx_registrar_pago", [
-                id,
-                float(request.form["monto"]),
-                request.form["metodo_pago"],
-                request.form.get("comprobante") or None,
-                None, None, None
-            ])
-            msg = out[6] if len(out) > 6 and out[6] else "Pago procesado."
-            flash(msg, "success" if "registrado" in (msg or "") and "Error" not in (msg or "") else "info")
+            _, out = call_proc_named(
+                "sp_trx_registrar_pago",
+                [
+                    id,
+                    float(request.form["monto"]),
+                    request.form["metodo_pago"],
+                    request.form.get("comprobante") or None,
+                ],
+                constants.SP_OUT["sp_trx_registrar_pago"],
+            )
+            flash_out(out, fallback_danger="Pago no registrado.")
         except Exception as e:
             flash(f"Error al registrar pago: {e}", "danger")
         return redirect(url_for("factura_detalle", id=id))
@@ -509,8 +548,12 @@ def factura_pagar(id):
 @app.route("/facturacion/<int:id>/anular", methods=["POST"])
 def factura_anular(id):
     try:
-        _, out = call_proc_out("sp_trx_anular_factura", [id, None])
-        flash(out[1], "info")
+        _, out = call_proc_named(
+            "sp_trx_anular_factura",
+            [id],
+            constants.SP_OUT["sp_trx_anular_factura"],
+        )
+        flash_out(out, fallback_danger="No se pudo anular la factura.")
     except Exception as e:
         flash(f"Error al anular: {e}", "danger")
     return redirect(url_for("factura_detalle", id=id))
@@ -519,8 +562,12 @@ def factura_anular(id):
 @app.route("/facturacion/<int:id>/eliminar", methods=["POST"])
 def factura_eliminar(id):
     try:
-        _, out = call_proc_out("sp_trx_anular_factura", [id, None])
-        flash(out[1] or "Factura anulada.", "info")
+        _, out = call_proc_named(
+            "sp_trx_anular_factura",
+            [id],
+            constants.SP_OUT["sp_trx_anular_factura"],
+        )
+        flash_out(out, fallback_danger="Factura no anulada.")
     except Exception as e:
         flash(f"Error al eliminar: {e}", "danger")
     return redirect(url_for("factura_detalle", id=id))
