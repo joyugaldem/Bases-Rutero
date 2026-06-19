@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import csrf_input %}
 {% block title %}{{ ruta.nombre }}{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -7,6 +8,7 @@
   <span class="badge badge-estado-{{ ruta.estado_ruta }}">{{ ruta.estado_ruta }}</span>
   <a href="{{ url_for('ruta_editar', id=ruta.id_ruta) }}" class="btn btn-sm btn-outline-secondary ms-2"><i class="bi bi-pencil me-1"></i>Editar</a>
   <form method="post" action="{{ url_for('ruta_eliminar', id=ruta.id_ruta) }}" class="d-inline" onsubmit="return confirm('¿Eliminar esta ruta?')">
+      {{ csrf_input() }}
     <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar</button>
   </form>
 </div>

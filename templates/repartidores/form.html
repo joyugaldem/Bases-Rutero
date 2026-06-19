@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import csrf_input %}
 {% block title %}{{ 'Editar' if repartidor else 'Nuevo' }} Repartidor{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -8,6 +9,7 @@
 <div class="card" style="max-width:480px">
   <div class="card-body">
     <form method="post" class="needs-validation" novalidate>
+      {{ csrf_input() }}
       <div class="mb-3">
         <label class="form-label">Nombre completo *</label>
         <input type="text" name="nombre" class="form-control" required

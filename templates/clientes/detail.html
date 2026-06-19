@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import csrf_input %}
 {% block title %}{{ cliente.razon_social }}{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -21,6 +22,7 @@
         <div class="d-flex gap-2 mt-2">
           <a href="{{ url_for('cliente_editar', id=cliente.id_cliente) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
           <form method="post" action="{{ url_for('cliente_eliminar', id=cliente.id_cliente) }}" onsubmit="return confirm('¿Eliminar este cliente?')">
+      {{ csrf_input() }}
             <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar</button>
           </form>
         </div>

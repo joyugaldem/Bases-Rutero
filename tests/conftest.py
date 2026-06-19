@@ -4,6 +4,26 @@ import sys
 import pytest
 
 
+# Configurar SECRET_KEY ANTES de importar app/config, porque config.py
+# ahora exige la variable y lanza RuntimeError si falta. Usamos una key
+# fija de dev (>= 32 chars para no romper el check de prod).
+os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-32-chars")
+os.environ.setdefault("FLASK_DEBUG", "1")
+
+# Mapear TEST_DB_* a DB_* para que config.py (que lee DB_*) use los
+# mismos valores que las fixtures. Sin esto, config intenta conectar
+# a localhost:3306 mientras las fixtures usan TEST_DB_HOST:TEST_DB_PORT.
+for var_in, var_out in (
+    ("TEST_DB_HOST", "DB_HOST"),
+    ("TEST_DB_PORT", "DB_PORT"),
+    ("TEST_DB_USER", "DB_USER"),
+    ("TEST_DB_PASSWORD", "DB_PASSWORD"),
+    ("TEST_DB_NAME", "DB_NAME"),
+):
+    val = os.environ.get(var_in)
+    if val is not None:
+        os.environ.setdefault(var_out, val)
+
 # Añade el directorio raíz al path para poder importar config
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

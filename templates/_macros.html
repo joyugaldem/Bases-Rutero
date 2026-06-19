@@ -1,0 +1,12 @@
+{#
+  Macros reutilizables para templates.
+
+  csrf_input() — genera el <input hidden> con el token CSRF. Incluir
+  dentro de cualquier <form method="post">. Como Flask-WTF también
+  acepta el header X-CSRFToken, los formularios AJAX pueden usar
+  `{{ csrf_token() }}` en JS para construir el header.
+#}
+
+{% macro csrf_input() -%}
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+{%- endmacro %}

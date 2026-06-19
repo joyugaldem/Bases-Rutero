@@ -5,9 +5,12 @@ Módulos: Productos, Clientes, Rutas/Repartidores, Facturación
 """
 
 import functools
-from flask import Flask, render_template, redirect, url_for, request, flash
-from werkzeug.exceptions import BadRequestKeyError
+import logging
 import os
+from logging.handlers import RotatingFileHandler
+from flask import Flask, render_template, redirect, url_for, request, flash
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from werkzeug.exceptions import BadRequestKeyError
 import config
 from db import get_db, close_db, call_proc, call_proc_dict, call_proc_named, query
 import constants
@@ -16,11 +19,68 @@ app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
 app.teardown_appcontext(close_db)
 
+# ============================================================
+# CSRF Protection
+# ============================================================
+# Flask-WTF valida automáticamente un token csrf_token en todas las
+# peticiones POST/PUT/DELETE/PATCH. Los templates deben incluir
+# {{ csrf_token() }} dentro de cada <form method="post">.
+# También acepta el header X-CSRFToken (útil para AJAX).
+csrf = CSRFProtect(app)
+
+
+# ============================================================
+# Logging
+# ============================================================
+def _configure_logging():
+    """Configura logging estructurado: archivo rotativo + consola.
+
+    En producción rota el archivo logs/app.log (10 MB máx, 5 backups).
+    En desarrollo va solo a stderr.
+    """
+    if not config.FLASK_DEBUG:
+        log_dir = os.path.join(os.path.dirname(__file__), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            os.path.join(log_dir, "app.log"),
+            maxBytes=10 * 1024 * 1024,  # 10 MB
+            backupCount=5,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        ))
+        app.logger.addHandler(file_handler)
+
+    app.logger.setLevel(logging.INFO if not config.FLASK_DEBUG else logging.DEBUG)
+    app.logger.info("App iniciada (debug=%s)", config.FLASK_DEBUG)
+
+
+_configure_logging()
+
+
+# ============================================================
+# Security headers
+# ============================================================
+@app.after_request
+def add_security_headers(response):
+    """Añade headers de seguridad a todas las respuestas HTTP."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
 
 @app.context_processor
 def inject_globals():
-    """Inyecta constantes del módulo constants a todos los templates."""
-    return {"constants": constants}
+    """Inyecta constantes y csrf_token() a todos los templates.
+
+    csrf_token() se inyecta explícitamente para que esté disponible
+    sin tener que importar flask_wtf en cada template.
+    """
+    return {"constants": constants, "csrf_token": generate_csrf}
 
 
 def form_get(key, cast=str, default=None):

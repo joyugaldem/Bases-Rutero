@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import csrf_input %}
 {% block title %}Clientes{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -21,6 +22,7 @@
           <td class="text-end">
             <a href="{{ url_for('cliente_editar', id=c.id_cliente) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
             <form method="post" action="{{ url_for('cliente_eliminar', id=c.id_cliente) }}" class="d-inline" onsubmit="return confirm('¿Desactivar cliente?')">
+      {{ csrf_input() }}
               <button class="btn btn-sm btn-outline-warning"><i class="bi bi-person-x"></i></button>
             </form>
           </td>
