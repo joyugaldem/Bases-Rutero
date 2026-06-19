@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import csrf_input, pagination %}
+{% from "_macros.html" import csrf_input, pagination, confirm_delete %}
 {% block title %}Facturas{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -48,10 +48,9 @@
           <td class="text-end">
             <a href="{{ url_for('factura_detalle', id=f.id_factura) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>
             {% if f.estado_factura in ['Emitida', 'Pendiente'] %}
-            <form method="post" action="{{ url_for('factura_eliminar', id=f.id_factura) }}" class="d-inline" onsubmit="return confirm('¿Eliminar la factura {{ f.numero_factura }}?')">
-      {{ csrf_input() }}
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-            </form>
+            {{ confirm_delete('del-fact-' ~ f.id_factura,
+                              url_for('factura_eliminar', id=f.id_factura),
+                              '¿Eliminar la factura <strong>' ~ f.numero_factura ~ '</strong>?') }}
             {% endif %}
           </td>
         </tr>

@@ -10,6 +10,11 @@
   si hay más de una página. `pager` es el dict que retorna el helper
   paginate() en app.py. `endpoint` es el nombre de la vista. Los
   query params actuales se preservan al navegar entre páginas.
+
+  confirm_delete(modal_id, action, message, button_label, button_class) —
+  Renderiza un botón que abre un modal Bootstrap de confirmación. El
+  modal contiene un <form method="post"> con csrf_token. Reemplaza el
+  patrón anterior de onsubmit="return confirm('...')".
 #}
 
 {% macro csrf_input() -%}
@@ -35,4 +40,61 @@
   </ul>
 </nav>
 {% endif %}
+{%- endmacro %}
+
+
+{% macro confirm_delete(modal_id, action, message, button_class="btn-outline-danger") -%}
+<button type="button" class="btn btn-sm {{ button_class }}"
+        data-bs-toggle="modal" data-bs-target="#{{ modal_id }}"
+        title="Eliminar">
+  <i class="bi bi-trash"></i>
+</button>
+<div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-labelledby="{{ modal_id }}-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="{{ modal_id }}-label">Confirmar eliminación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">{{ message }}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" action="{{ action }}" class="d-inline">
+          {{ csrf_input() }}
+          <button type="submit" class="btn btn-danger">Eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{%- endmacro %}
+
+
+{% macro confirm_anular(modal_id, action, message) -%}
+<button type="button" class="btn btn-outline-danger btn-sm"
+        data-bs-toggle="modal" data-bs-target="#{{ modal_id }}">
+  <i class="bi bi-x-circle me-1"></i>Anular
+</button>
+<div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-labelledby="{{ modal_id }}-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="{{ modal_id }}-label">Confirmar anulación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">{{ message }}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="post" action="{{ action }}" class="d-inline">
+          {{ csrf_input() }}
+          <button type="submit" class="btn btn-danger">Sí, anular</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {%- endmacro %}

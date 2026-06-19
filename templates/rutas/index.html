@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import csrf_input %}
+{% from "_macros.html" import csrf_input, confirm_delete %}
 {% block title %}Rutas{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -20,10 +20,9 @@
         <div class="d-flex gap-2 flex-wrap">
           <a href="{{ url_for('ruta_detalle', id=r.id_ruta) }}" class="btn btn-sm btn-outline-primary">Ver detalle</a>
           <a href="{{ url_for('ruta_editar', id=r.id_ruta) }}" class="btn btn-sm btn-outline-secondary">Editar</a>
-          <form method="post" action="{{ url_for('ruta_eliminar', id=r.id_ruta) }}" onsubmit="return confirm('¿Eliminar esta ruta?')">
-      {{ csrf_input() }}
-            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-          </form>
+          {{ confirm_delete('del-ruta-' ~ r.id_ruta,
+                            url_for('ruta_eliminar', id=r.id_ruta),
+                            '¿Eliminar la ruta <strong>' ~ r.nombre ~ '</strong>?') }}
         </div>
       </div>
     </div>

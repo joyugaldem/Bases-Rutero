@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import csrf_input %}
+{% from "_macros.html" import csrf_input, confirm_delete %}
 {% block title %}{{ producto.nombre_comercial }}{% endblock %}
 {% block content %}
 <div class="d-flex align-items-center mb-3 gap-2">
@@ -18,10 +18,9 @@
         </dl>
         <div class="d-flex gap-2 mt-3">
           <a href="{{ url_for('producto_editar', id=producto.id_producto) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Editar</a>
-          <form method="post" action="{{ url_for('producto_eliminar', id=producto.id_producto) }}" onsubmit="return confirm('¿Eliminar este producto?')">
-      {{ csrf_input() }}
-            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Eliminar</button>
-          </form>
+          {{ confirm_delete('del-prod-d-' ~ producto.id_producto,
+                            url_for('producto_eliminar', id=producto.id_producto),
+                            '¿Eliminar el producto <strong>' ~ producto.nombre_comercial ~ '</strong>?') }}
         </div>
       </div>
     </div>
