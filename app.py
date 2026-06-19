@@ -15,21 +15,10 @@ app.secret_key = config.SECRET_KEY
 app.teardown_appcontext(close_db)
 
 
-def form_required(*keys):
-    missing = [k for k in keys if not request.form.get(k, "").strip()]
-    if missing:
-        raise ValueError(f"Campos requeridos faltantes: {', '.join(missing)}")
-    return [request.form[k].strip() for k in keys]
-
-
-def form_get(key, cast=str, default=None):
-    val = request.form.get(key, "").strip()
-    if not val:
-        return default
-    try:
-        return cast(val)
-    except (ValueError, TypeError):
-        raise ValueError(f"Campo '{key}' con valor inválido: {val!r}")
+@app.context_processor
+def inject_globals():
+    """Inyecta constantes del módulo constants a todos los templates."""
+    return {"constants": constants}
 
 
 def flash_out(out, fallback_danger="Error desconocido."):
@@ -85,7 +74,7 @@ def productos_nuevo():
             return redirect(url_for("producto_detalle", id=out["id_producto"]))
         except Exception as e:
             flash(f"Error al registrar producto: {e}", "danger")
-    categorias = ["Leche","Queso","Natilla","Crema","Cuajada","Yogurt","Otro"]
+    categorias = constants.CATEGORIAS_PRODUCTO
     return render_template("productos/form.html", producto=None, categorias=categorias)
 
 
@@ -119,8 +108,8 @@ def producto_editar(id):
         except Exception as e:
             flash(f"Error: {e}", "danger")
     prod = call_proc("sp_consultar_productos", [id])
-    categorias = ["Leche","Queso","Natilla","Crema","Cuajada","Yogurt","Otro"]
-    estados    = ["Activo","Inactivo","Descontinuado"]
+    categorias = constants.CATEGORIAS_PRODUCTO
+    estados    = constants.ESTADOS_PRODUCTO
     return render_template("productos/form.html",
                            producto=prod[0][0] if prod and prod[0] else None,
                            categorias=categorias, estados=estados)
@@ -158,7 +147,7 @@ def presentacion_nueva(id_producto):
             flash(f"Error: {e}", "danger")
         return redirect(url_for("producto_detalle", id=id_producto))
     prod = call_proc("sp_consultar_productos", [id_producto])
-    unidades = ["ml","L","g","kg","Unidad"]
+    unidades = constants.UNIDADES_MEDIDA
     return render_template("productos/form_presentacion.html",
                            producto=prod[0][0] if prod and prod[0] else None,
                            unidades=unidades)
@@ -268,7 +257,7 @@ def cliente_editar(id):
             flash(f"Error: {e}", "danger")
     rows  = call_proc("sp_consultar_clientes", [id])
     rutas = call_proc("sp_consultar_rutas", [None])
-    estados = ["Activo","Inactivo","Suspendido"]
+    estados = constants.ESTADOS_CLIENTE
     return render_template("clientes/form.html",
                            cliente=rows[0][0] if rows and rows[0] else None,
                            rutas=rutas[0] if rutas else [],
@@ -345,7 +334,7 @@ def ruta_editar(id):
         except Exception as e:
             flash(f"Error: {e}", "danger")
     rutas  = call_proc("sp_consultar_rutas", [id])
-    estados = ["Activa","Inactiva","Suspendida"]
+    estados = constants.ESTADOS_RUTA
     return render_template("rutas/form.html",
                            ruta=rutas[0][0] if rutas and rutas[0] else None,
                            estados=estados)
@@ -428,7 +417,7 @@ def repartidor_editar(id):
         except Exception as e:
             flash(f"Error: {e}", "danger")
     rows   = call_proc("sp_consultar_repartidores", [id])
-    estados = ["Activo","Inactivo","Suspendido"]
+    estados = constants.ESTADOS_REPARTIDOR
     return render_template("repartidores/form.html",
                            repartidor=rows[0][0] if rows and rows[0] else None,
                            estados=estados)
@@ -589,7 +578,7 @@ def rpt_ventas_ruta():
 
 @app.route("/reportes/creditos")
 def rpt_creditos():
-    rows = call_proc("sp_cur_resumen_creditos", [])
+    rows = call_proc("sp_cur_resumen_creditos")
     return render_template("reportes/creditos.html",
                            datos=rows[0] if rows else [])
 

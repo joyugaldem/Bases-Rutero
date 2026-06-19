@@ -24,7 +24,7 @@
         <label class="form-label">Método de pago *</label>
         <select name="metodo_pago" class="form-select" required>
           <option value="">Seleccionar…</option>
-          <option>Efectivo</option><option>Transferencia</option><option>SINPE</option><option>Cheque</option>
+          {% for m in constants.METODOS_PAGO %}<option>{{ m }}</option>{% endfor %}
         </select>
         <div class="invalid-feedback">Seleccione el método de pago.</div>
       </div>
