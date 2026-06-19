@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 from flask import Flask, request, redirect, url_for, flash, get_flashed_messages
-from app import form_get, handle_form_errors, app
+from app import form_get, handle_form_errors, paginate, app
 
 
 # ============================================================
@@ -114,3 +114,85 @@ class TestHandleFormErrors:
             assert result.status_code == 302
             messages = get_flashed_messages(with_categories=True)
             assert any("campo_que_no_existe" in msg for cat, msg in messages)
+
+
+# ============================================================
+# paginate
+# ============================================================
+
+class TestPaginate:
+    """Tests para el helper paginate()."""
+
+    def test_pagina_1_por_defecto(self):
+        """Sin parámetro page, devuelve la primera página."""
+        with app.test_request_context("/__test"):
+            items = list(range(50))
+            page_items, pager = paginate(items, per_page=10)
+            assert page_items == list(range(0, 10))
+            assert pager["page"] == 1
+            assert pager["pages"] == 5
+            assert pager["total"] == 50
+            assert pager["has_next"] is True
+            assert pager["has_prev"] is False
+            assert pager["next_page"] == 2
+            assert pager["prev_page"] == 0
+
+    def test_pagina_intermedia(self):
+        with app.test_request_context("/__test?page=3"):
+            items = list(range(50))
+            page_items, pager = paginate(items, per_page=10)
+            assert page_items == list(range(20, 30))
+            assert pager["page"] == 3
+            assert pager["has_next"] is True
+            assert pager["has_prev"] is True
+
+    def test_ultima_pagina(self):
+        with app.test_request_context("/__test?page=5"):
+            items = list(range(50))
+            page_items, pager = paginate(items, per_page=10)
+            assert page_items == list(range(40, 50))
+            assert pager["has_next"] is False
+
+    def test_lista_vacia(self):
+        with app.test_request_context("/__test"):
+            page_items, pager = paginate([], per_page=10)
+            assert page_items == []
+            assert pager["total"] == 0
+            assert pager["pages"] == 1  # al menos 1 página
+            assert pager["has_next"] is False
+
+    def test_lista_menor_que_per_page(self):
+        """Si hay menos items que per_page, cabe en 1 página."""
+        with app.test_request_context("/__test"):
+            items = [1, 2, 3]
+            page_items, pager = paginate(items, per_page=10)
+            assert page_items == [1, 2, 3]
+            assert pager["pages"] == 1
+
+    def test_page_negativo_se_clampea_a_1(self):
+        """Un page negativo o 0 se trata como página 1."""
+        with app.test_request_context("/__test?page=-5"):
+            items = list(range(50))
+            page_items, pager = paginate(items, per_page=10)
+            assert pager["page"] == 1
+
+    def test_page_mayor_a_total_se_clampea(self):
+        """Un page mayor al total se clamea a la última página."""
+        with app.test_request_context("/__test?page=99"):
+            items = list(range(50))
+            page_items, pager = paginate(items, per_page=10)
+            assert pager["page"] == 5  # última
+            assert page_items == list(range(40, 50))
+
+    def test_page_invalido_lanza_value_error(self):
+        """Un page no entero (e.g. 'abc') lanza ValueError."""
+        with app.test_request_context("/__test?page=abc"):
+            with pytest.raises(ValueError, match="page.*inv"):
+                paginate(list(range(10)))
+
+    def test_per_page_custom(self):
+        with app.test_request_context("/__test"):
+            items = list(range(100))
+            page_items, pager = paginate(items, per_page=25)
+            assert pager["pages"] == 4
+            assert page_items == list(range(0, 25))

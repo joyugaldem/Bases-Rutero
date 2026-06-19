@@ -20,10 +20,48 @@
     .badge-estado-Suspendido, .badge-estado-Suspendida, .badge-estado-Anulada, .badge-estado-Vencido { background-color: #dc3545 !important; }
     .badge-estado-Pendiente, .badge-estado-En\ curso { background-color: #fd7e14 !important; }
     .badge-estado-Completado { background-color: #0d6efd !important; }
+
+    /* ---------- Sidebar responsive ---------- */
+    .sidebar-toggle {
+      position: fixed;
+      top: .75rem;
+      left: .75rem;
+      z-index: 1040;
+    }
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 1030;
+    }
+    @media (max-width: 767.98px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1041;
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+      }
+      body.sidebar-open .sidebar { transform: translateX(0); }
+      body.sidebar-open .sidebar-overlay { display: block; }
+      .content { padding-left: 1rem; padding-right: 1rem; }
+    }
   </style>
 </head>
 <body>
 <div class="d-flex">
+  <!-- Botón hamburguesa solo en móvil -->
+  <button class="btn btn-primary sidebar-toggle d-md-none" type="button"
+          onclick="document.body.classList.toggle('sidebar-open')"
+          aria-label="Menú">
+    <i class="bi bi-list"></i>
+  </button>
+
+  <!-- Overlay para cerrar el sidebar en móvil -->
+  <div class="sidebar-overlay d-md-none" onclick="document.body.classList.remove('sidebar-open')"></div>
+
   <!-- Sidebar -->
   <nav class="sidebar d-flex flex-column" style="width:230px;min-width:230px;">
     <div class="brand"><i class="bi bi-droplet-half me-2"></i>Lácteos M.C.</div>
@@ -88,6 +126,15 @@ document.querySelectorAll('form.needs-validation').forEach(function(form) {
     }
     form.classList.add('was-validated');
   }, true);
+});
+
+/* ---------- Cerrar sidebar al navegar en móvil ---------- */
+document.querySelectorAll('.sidebar .nav-link').forEach(function(link) {
+  link.addEventListener('click', function() {
+    if (window.innerWidth < 768) {
+      document.body.classList.remove('sidebar-open');
+    }
+  });
 });
 </script>
 </body>

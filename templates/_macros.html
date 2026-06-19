@@ -5,8 +5,34 @@
   dentro de cualquier <form method="post">. Como Flask-WTF también
   acepta el header X-CSRFToken, los formularios AJAX pueden usar
   `{{ csrf_token() }}` en JS para construir el header.
+
+  pagination(pager, endpoint) — renderiza los controles de paginación
+  si hay más de una página. `pager` es el dict que retorna el helper
+  paginate() en app.py. `endpoint` es el nombre de la vista. Los
+  query params actuales se preservan al navegar entre páginas.
 #}
 
 {% macro csrf_input() -%}
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+{%- endmacro %}
+
+
+{% macro pagination(pager, endpoint) -%}
+{% if pager and pager.pages > 1 %}
+<nav aria-label="Paginación" class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    <li class="page-item {% if not pager.has_prev %}disabled{% endif %}">
+      {% set qs = {} %}
+      {% for k, v in request.args.items() %}{% if k != 'page' and v %}{% set _ = qs.update({k: v}) %}{% endif %}{% endfor %}
+      <a class="page-link" href="{% if pager.has_prev %}{{ url_for(endpoint, page=pager.prev_page, **qs) }}{% else %}#{% endif %}">‹ Anterior</a>
+    </li>
+    <li class="page-item active">
+      <span class="page-link">Página {{ pager.page }} de {{ pager.pages }} <small class="text-muted">({{ pager.total }})</small></span>
+    </li>
+    <li class="page-item {% if not pager.has_next %}disabled{% endif %}">
+      <a class="page-link" href="{% if pager.has_next %}{{ url_for(endpoint, page=pager.next_page, **qs) }}{% else %}#{% endif %}">Siguiente ›</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
 {%- endmacro %}

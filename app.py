@@ -131,6 +131,38 @@ def flash_out(out, fallback_danger="Error desconocido."):
     else:
         flash(msg, "danger")
 
+
+def paginate(items, per_page=20):
+    """Pagina una lista en memoria y retorna (page_items, pager_info).
+
+    `pager_info` es un dict listo para pasar al template:
+        {"page": int, "pages": int, "total": int, "has_prev": bool, "has_next": bool}
+
+    Lee `page` de `request.args` (default 1). Lanza ValueError si page
+    no es entero positivo (cae en handle_form_errors).
+    """
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (ValueError, TypeError):
+        raise ValueError(f"parámetro 'page' inválido: {request.args.get('page')!r}")
+
+    total = len(items)
+    pages = max(1, (total + per_page - 1) // per_page)  # ceil(total/per_page)
+    page = min(page, pages)  # clamp al máximo
+    start = (page - 1) * per_page
+    end = start + per_page
+
+    return items[start:end], {
+        "page": page,
+        "pages": pages,
+        "total": total,
+        "per_page": per_page,
+        "has_prev": page > 1,
+        "has_next": page < pages,
+        "prev_page": page - 1,
+        "next_page": page + 1,
+    }
+
 # ============================================================
 # INICIO
 # ============================================================
@@ -160,7 +192,16 @@ def index():
 @app.route("/productos")
 def productos_lista():
     rows = call_proc("sp_consultar_productos", [None])
-    return render_template("productos/index.html", productos=rows[0] if rows else [])
+    all_items = rows[0] if rows else []
+    q = (request.args.get("q") or "").strip().lower()
+    if q:
+        all_items = [p for p in all_items
+                     if q in (p.get("nombre_comercial") or "").lower()
+                     or q in (p.get("codigo_barras") or "").lower()
+                     or q in (p.get("categoria") or "").lower()]
+    items, pager = paginate(all_items, per_page=20)
+    return render_template("productos/index.html",
+                           productos=items, pager=pager, q=q)
 
 
 @app.route("/productos/nuevo", methods=["GET", "POST"])
@@ -290,7 +331,16 @@ def lote_nuevo(id_producto):
 @app.route("/clientes")
 def clientes_lista():
     rows = call_proc("sp_consultar_clientes", [None])
-    return render_template("clientes/index.html", clientes=rows[0] if rows else [])
+    all_items = rows[0] if rows else []
+    q = (request.args.get("q") or "").strip().lower()
+    if q:
+        all_items = [c for c in all_items
+                     if q in (c.get("razon_social") or "").lower()
+                     or q in (c.get("nombre") or "").lower()
+                     or q in (c.get("ruta_nombre") or "").lower()]
+    items, pager = paginate(all_items, per_page=20)
+    return render_template("clientes/index.html",
+                           clientes=items, pager=pager, q=q)
 
 
 @app.route("/clientes/nuevo", methods=["GET", "POST"])
@@ -547,10 +597,13 @@ def facturacion_lista():
     fecha_desde = request.args.get("desde") or None
     fecha_hasta = request.args.get("hasta") or None
     id_cliente  = request.args.get("cliente") or None
+    page        = request.args.get("page", 1)
     rows = call_proc("sp_consultar_facturas", [id_cliente, fecha_desde, fecha_hasta])
+    all_items = rows[0] if rows else []
+    items, pager = paginate(all_items, per_page=25)
     clientes = call_proc("sp_consultar_clientes", [None])
     return render_template("facturacion/index.html",
-                           facturas=rows[0] if rows else [],
+                           facturas=items, pager=pager,
                            clientes=clientes[0] if clientes else [],
                            filtros={"desde": fecha_desde, "hasta": fecha_hasta, "cliente": id_cliente})
 
