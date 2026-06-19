@@ -8,16 +8,18 @@ Uso: python scripts/recreate_stored_procs.py
 
 import os
 import sys
-import re
 import glob
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 import mysql.connector
+from sql_parser import split_statements
 
 
-DELIMITER_FILES = {"02_crud.sql", "03_transacciones.sql", "05_triggers.sql",
-                   "06_cursores.sql", "07_consultas_avanzadas.sql"}
+# Archivos que contienen stored procedures, triggers o cursores
+# (los únicos donde este script necesita re-aplicar SQL)
+PROC_FILES = {"02_crud.sql", "03_transacciones.sql", "05_triggers.sql",
+              "06_cursores.sql", "07_consultas_avanzadas.sql"}
 
 
 def get_connection():
@@ -31,63 +33,6 @@ def get_connection():
         "autocommit": False,
     }
     return mysql.connector.connect(**kwargs)
-
-
-def split_statements(filename, content):
-    name = os.path.basename(filename)
-    if name in DELIMITER_FILES:
-        parts = content.split("//")
-        statements = []
-        for part in parts:
-            lines = part.splitlines()
-            cleaned_lines = []
-            for line in lines:
-                l = line.strip()
-                if l.upper().startswith("DELIMITER") or l.upper().startswith("USE "):
-                    continue
-                cleaned_lines.append(line)
-            stmt = "\n".join(cleaned_lines).strip()
-            if stmt:
-                statements.append(stmt)
-        return statements
-    else:
-        lines = []
-        for line in content.splitlines():
-            stripped = re.sub(r"--.*$", "", line).strip()
-            if stripped:
-                lines.append(stripped)
-        sql = "\n".join(lines)
-        tokens = []
-        buffer = []
-        in_string = False
-        string_char = None
-        i = 0
-        while i < len(sql):
-            c = sql[i]
-            if not in_string and c in ("'", '"'):
-                in_string = True
-                string_char = c
-                buffer.append(c)
-            elif in_string and c == string_char and (i + 1 >= len(sql) or sql[i + 1] != string_char):
-                in_string = False
-                string_char = None
-                buffer.append(c)
-            elif not in_string and c == "'" and i + 1 < len(sql) and sql[i + 1] == "'":
-                buffer.append("''")
-                i += 1
-            elif not in_string and c == ';':
-                token = "".join(buffer).strip()
-                if token:
-                    tokens.append(token)
-                buffer = []
-            else:
-                buffer.append(c)
-            i += 1
-        tail = "".join(buffer).strip()
-        if tail:
-            tokens.append(tail)
-        return [t for t in tokens if not t.upper().startswith("USE ")
-                                         and not t.upper().startswith("SET NAMES")]
 
 
 def run():
@@ -120,19 +65,19 @@ def run():
             pass
 
     conn.commit()
-    print(f"Procedures/triggers originales eliminados.")
+    print("Procedures/triggers originales eliminados.")
 
     sql_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sql")
     sql_files = sorted(glob.glob(os.path.join(sql_dir, "*.sql")))
     total = 0
     for sql_path in sql_files:
         name = os.path.basename(sql_path)
-        if name not in DELIMITER_FILES:
+        if name not in PROC_FILES:
             continue
         print(f"\n→ {name}")
         with open(sql_path, encoding="utf-8") as f:
             content = f.read()
-        stmts = split_statements(sql_path, content)
+        stmts = split_statements(name, content)
         ok, fail = 0, 0
         for stmt in stmts:
             if not stmt.strip():

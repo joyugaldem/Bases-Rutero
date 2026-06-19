@@ -7,10 +7,11 @@ Variables requeridas (APPLY_DB_* tienen prioridad, luego cae a DB_*):
   APPLY_DB_HOST, APPLY_DB_PORT, APPLY_DB_USER, APPLY_DB_PASSWORD, APPLY_DB_NAME
   o bien las variables DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME del servicio.
 """
-import re, glob, os, sys
+import glob, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import mysql.connector
+from sql_parser import split_sql
 
 HOST     = os.environ.get("APPLY_DB_HOST")     or os.environ.get("DB_HOST",     "localhost")
 PORT     = int(os.environ.get("APPLY_DB_PORT") or os.environ.get("DB_PORT",     3306))
@@ -20,41 +21,6 @@ DB       = os.environ.get("APPLY_DB_NAME")     or os.environ.get("DB_NAME",     
 
 if not HOST or HOST == "localhost" and not os.environ.get("DB_HOST"):
     sys.exit("ERROR: Defina APPLY_DB_HOST o DB_HOST con el host de la base de datos.")
-
-
-def split_sql(content):
-    delimiter = ";"
-    statements = []
-    current_lines = []
-
-    for line in content.splitlines():
-        stripped = line.strip()
-        m = re.match(r"^DELIMITER\s+(\S+)\s*$", stripped, re.IGNORECASE)
-        if m:
-            delimiter = m.group(1)
-            continue
-        if not stripped or stripped.startswith("--"):
-            if current_lines:
-                current_lines.append(line)
-            continue
-        current_lines.append(line)
-        if stripped.endswith(delimiter):
-            stmt = "\n".join(current_lines).rstrip()
-            if stmt.endswith(delimiter):
-                stmt = stmt[: -len(delimiter)].rstrip()
-            clean = re.sub(r"--.*$", "", stmt, flags=re.MULTILINE).strip()
-            clean = re.sub(r"/\*.*?\*/", "", clean, flags=re.DOTALL).strip()
-            if clean and not re.match(r"^USE\b", clean, re.IGNORECASE):
-                statements.append(stmt)
-            current_lines = []
-
-    if current_lines:
-        stmt = "\n".join(current_lines).strip()
-        clean = re.sub(r"--.*$", "", stmt, flags=re.MULTILINE).strip()
-        if clean and not re.match(r"^USE\b", clean, re.IGNORECASE):
-            statements.append(stmt)
-
-    return statements
 
 
 def main():
@@ -99,8 +65,6 @@ def main():
                 else:
                     fail += 1
                     print(f"   [!] {s[:80].strip()}... -> {err[:120]}")
-            finally:
-                pass
         cur.close()
         total += ok
         print(f"   {ok} ok, {skip} skip, {fail} errores")

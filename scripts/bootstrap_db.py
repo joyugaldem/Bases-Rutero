@@ -8,93 +8,12 @@ Uso: python bootstrap_db.py
 
 import os
 import sys
-import re
 import glob
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 import mysql.connector
-
-
-DELIMITER_FILES = {"02_crud.sql", "03_transacciones.sql", "05_triggers.sql",
-                   "06_cursores.sql", "07_consultas_avanzadas.sql"}
-
-
-def strip_comments(sql):
-    """Elimina comentarios de linea (--) y de bloque aunque esten dentro de strings."""
-    lines = []
-    for line in sql.splitlines():
-        stripped = re.sub(r"--.*$", "", line).strip()
-        if stripped:
-            lines.append(stripped)
-    return "\n".join(lines)
-
-
-def split_statements(filename, content):
-    """
-    Divide el contenido de un archivo .sql en sentencias ejecutables.
-    - Archivos con DELIMITER //: split por '//' (cada bloque es un statement).
-    - Archivos normales: split por ';' a nivel de tokens.
-    Retorna lista de strings no vacios.
-    """
-    name = os.path.basename(filename)
-
-    if name in DELIMITER_FILES:
-        parts = content.split("//")
-        statements = []
-        for part in parts:
-            lines = part.splitlines()
-            cleaned_lines = []
-            for line in lines:
-                l = line.strip()
-                if l.upper().startswith("DELIMITER"):
-                    continue
-                cleaned_lines.append(line)
-            stmt = "\n".join(cleaned_lines).strip()
-            if stmt:
-                statements.append(stmt)
-        return statements
-    else:
-        sql = strip_comments(content)
-        tokens = []
-        buffer = []
-        in_string = False
-        string_char = None
-
-        i = 0
-        while i < len(sql):
-            c = sql[i]
-            if not in_string and c in ("'", '"'):
-                in_string = True
-                string_char = c
-                buffer.append(c)
-            elif in_string and c == string_char and (i + 1 >= len(sql) or sql[i + 1] != string_char):
-                in_string = False
-                string_char = None
-                buffer.append(c)
-            elif not in_string and c == "'" and i + 1 < len(sql) and sql[i + 1] == "'":
-                buffer.append("''")
-                i += 1
-            elif not in_string and c == ';':
-                token = "".join(buffer).strip()
-                if token:
-                    tokens.append(token)
-                buffer = []
-            else:
-                buffer.append(c)
-            i += 1
-
-        tail = "".join(buffer).strip()
-        if tail:
-            tokens.append(tail)
-
-        result = []
-        for t in tokens:
-            t = t.strip()
-            if t.upper().startswith("USE ") or not t:
-                continue
-            result.append(t)
-        return result
+from sql_parser import split_statements
 
 
 def get_connection():
@@ -123,7 +42,7 @@ def run_bootstrap():
     conn = get_connection()
 
     if is_initialized(conn):
-        print("lacteosdb ya tiene tablas. Bootstrapping omitido.")
+        print(f"{config.DB_NAME} ya tiene tablas. Bootstrapping omitido.")
         conn.close()
         return
 
@@ -137,7 +56,7 @@ def run_bootstrap():
         with open(sql_path, encoding="utf-8") as f:
             content = f.read()
 
-        statements = split_statements(sql_path, content)
+        statements = split_statements(name, content)
         cur = conn.cursor()
         ok, fail = 0, 0
 
