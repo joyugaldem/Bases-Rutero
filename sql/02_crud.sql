@@ -213,7 +213,7 @@ END //
 DROP PROCEDURE IF EXISTS sp_consultar_clientes //
 CREATE PROCEDURE sp_consultar_clientes(IN p_id_cliente INT)
 BEGIN
-    SELECT c.id_cliente, p.nombre, c.razon_social, c.direccion_compuesta,
+    SELECT c.id_cliente, c.id_persona, p.nombre, c.razon_social, c.direccion_compuesta,
            c.credito_autorizado, c.estado_cliente,
            r.nombre AS ruta_nombre, r.zona_geografica
     FROM cliente c

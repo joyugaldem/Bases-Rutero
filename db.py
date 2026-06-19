@@ -71,6 +71,21 @@ def call_proc(proc_name, args=()):
     return results
 
 
+def call_proc_dict(proc_name, args=(), first=True):
+    """
+    Llama a un stored procedure y retorna su primer result set como una
+    lista plana de diccionarios.
+
+    Conveniencia para el caso común `results[0] if results else []`.
+    Si first=False, retorna la lista de result sets completa (igual que
+    call_proc).
+    """
+    results = call_proc(proc_name, args)
+    if first:
+        return results[0] if results else []
+    return results
+
+
 def call_proc_out(proc_name, args):
     """
     Llama a un stored procedure con parámetros OUT.

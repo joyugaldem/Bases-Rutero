@@ -9,7 +9,7 @@ from flask import Flask, render_template, redirect, url_for, request, flash
 from werkzeug.exceptions import BadRequestKeyError
 import os
 import config
-from db import get_db, close_db, call_proc, call_proc_named, query
+from db import get_db, close_db, call_proc, call_proc_dict, call_proc_named, query
 import constants
 
 app = Flask(__name__)
@@ -267,14 +267,13 @@ def cliente_nuevo():
 
 @app.route("/clientes/<int:id>")
 def cliente_detalle(id):
-    rows = call_proc("sp_consultar_clientes", [id])
-    if not rows or not rows[0]:
+    rows = call_proc_dict("sp_consultar_clientes", [id])
+    if not rows:
         flash("Cliente no encontrado.", "warning")
         return redirect(url_for("clientes_lista"))
-    cliente = rows[0][0]
-    # Obtener persona para teléfonos
-    persona = query("SELECT id_persona FROM cliente WHERE id_cliente=%s", [id], fetchone=True)
-    telefonos = call_proc("sp_consultar_telefonos", [persona["id_persona"]]) if persona else []
+    cliente = rows[0]
+    # id_persona viene ahora en el SP (fase 3); antes hacía un SELECT extra
+    telefonos = call_proc("sp_consultar_telefonos", [cliente["id_persona"]])
     facturas  = call_proc("sp_consultar_facturas", [id, None, None])
     return render_template("clientes/detail.html",
                            cliente=cliente,
