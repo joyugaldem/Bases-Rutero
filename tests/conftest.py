@@ -1,42 +1,57 @@
 """Pytest fixtures para tests de integración con MySQL."""
 import os
 import sys
-import subprocess
-import time
 import pytest
 
+
+# Añade el directorio raíz al path para poder importar config
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _try_connect():
+    """Intenta conectar a MySQL. Retorna la conexión o None si falla."""
+    import mysql.connector
+    try:
+        conn = mysql.connector.connect(
+            host=os.environ.get("TEST_DB_HOST", "localhost"),
+            port=int(os.environ.get("TEST_DB_PORT", "3306")),
+            user=os.environ.get("TEST_DB_USER", "root"),
+            password=os.environ.get("TEST_DB_PASSWORD", "test"),
+            database=os.environ.get("TEST_DB_NAME", "lacteosdb"),
+            charset="utf8mb4",
+            autocommit=True,
+            connection_timeout=5,
+        )
+        return conn
+    except Exception:
+        return None
 
 
 @pytest.fixture(scope="session")
 def mysql_connection():
-    """Conexión a MySQL de test (Docker service)."""
-    import mysql.connector
+    """Conexión a MySQL de test.
 
-    conn = mysql.connector.connect(
-        host=os.environ.get("TEST_DB_HOST", "localhost"),
-        port=int(os.environ.get("TEST_DB_PORT", "3306")),
-        user=os.environ.get("TEST_DB_USER", "root"),
-        password=os.environ.get("TEST_DB_PASSWORD", "test"),
-        database=os.environ.get("TEST_DB_NAME", "lacteosdb_test"),
-        charset="utf8mb4",
-        autocommit=True,
-    )
+    Si MySQL no está disponible, hace pytest.skip en lugar de fallar.
+    El bootstrap lo hace el CI (o manualmente con bootstrap_db.py) antes
+    de correr pytest; este fixture solo se conecta y comparte la conexión
+    entre tests.
+    """
+    conn = _try_connect()
+    if conn is None:
+        pytest.skip(
+            "MySQL no disponible en TEST_DB_HOST:TEST_DB_PORT. "
+            "Levanta MySQL o ajusta las variables TEST_DB_*"
+        )
     yield conn
     conn.close()
 
 
-@pytest.fixture(scope="session")
-def db_cursor(mysql_connection):
-    """Cursor reutilizable para la sesión."""
-    cur = mysql_connection.cursor()
-    yield cur
-    cur.close()
-
-
 @pytest.fixture(scope="function")
 def clean_db(mysql_connection):
-    """Limpia tablas en orden inverso al de inserción antes de cada test."""
+    """Limpia tablas en orden inverso al de inserción antes y después de cada test.
+
+    El orden es importante para respetar las FK constraints.
+    """
     tables_in_order = [
         "venta",
         "pago",
@@ -70,20 +85,3 @@ def clean_db(mysql_connection):
         except Exception:
             pass
     mysql_connection.commit()
-
-
-@pytest.fixture(scope="session")
-def bootstrap_db():
-    """Bootstrap de la BD de test (solo una vez por sesión)."""
-    test_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    script_path = os.path.join(test_dir, "scripts", "bootstrap_db.py")
-
-    result = subprocess.run(
-        [sys.executable, script_path],
-        env={**os.environ, "DB_NAME": "lacteosdb_test"},
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        pytest.fail(f"bootstrap_db.py falló:\n{result.stderr}")
-    yield

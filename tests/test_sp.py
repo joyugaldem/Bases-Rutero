@@ -3,7 +3,6 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-import mysql.connector
 
 
 class TestSpInsertarCliente:
@@ -171,12 +170,13 @@ class TestSpTrxRegistrarPago:
         id_factura, _, _ = self.setup_productos_cliente(mysql_connection)
         cur = mysql_connection.cursor()
 
+        # La factura de setup tiene saldo 1000. Un pago de 500 debe
+        # dejarlo en 500, no en 0 (el bug previo llamaba el SP 2 veces).
         args = [id_factura, 500.00, "Efectivo", None, None, None, None]
-        cur.callproc("sp_trx_registrar_pago", args)
+        out = list(cur.callproc("sp_trx_registrar_pago", args))
         for rs in cur.stored_results():
             rs.fetchall()
         mysql_connection.commit()
-        out = list(cur.callproc("sp_trx_registrar_pago", args))
 
         saldo = out[5]
         assert saldo == 500.00
@@ -199,17 +199,61 @@ class TestSpTrxRegistrarPago:
         assert estado == "Pagada"
 
     def test_pago_monto_excede_saldo_rechaza(self, mysql_connection, clean_db):
-        """Un pago mayor al saldo pendiente es rechazado."""
+        """Un pago mayor al saldo pendiente es rechazado.
+
+        El SP tiene un EXIT HANDLER que captura el SIGNAL y setea el
+        mensaje de error en el OUT p_mensaje, por lo que el caller no
+        recibe una excepción: debe verificar el mensaje y que el estado
+        no haya cambiado.
+        """
         id_factura, _, _ = self.setup_productos_cliente(mysql_connection)
         cur = mysql_connection.cursor()
 
+        # Capturar el saldo antes
+        cur.execute(
+            "SELECT saldo_pendiente FROM factura_credito WHERE id_factura = %s",
+            (id_factura,),
+        )
+        saldo_antes = cur.fetchone()[0]
+
+        # Contar pagos antes
+        cur.execute(
+            "SELECT COUNT(*) FROM pago WHERE id_factura_credito = %s",
+            (id_factura,),
+        )
+        pagos_antes = cur.fetchone()[0]
+
         args = [id_factura, 2000.00, "Efectivo", None, None, None, None]
-        with pytest.raises(mysql.connector.Error):
-            cur.callproc("sp_trx_registrar_pago", args)
-            mysql_connection.commit()
+        out = list(cur.callproc("sp_trx_registrar_pago", args))
+        for rs in cur.stored_results():
+            rs.fetchall()
+        mysql_connection.commit()
+
+        # El SP debe retornar mensaje de error
+        mensaje = out[6]
+        assert mensaje is not None
+        assert "Error" in mensaje or "error" in mensaje.lower()
+
+        # Y el saldo + cantidad de pagos no deben haber cambiado
+        cur.execute(
+            "SELECT saldo_pendiente FROM factura_credito WHERE id_factura = %s",
+            (id_factura,),
+        )
+        assert cur.fetchone()[0] == saldo_antes
+
+        cur.execute(
+            "SELECT COUNT(*) FROM pago WHERE id_factura_credito = %s",
+            (id_factura,),
+        )
+        assert cur.fetchone()[0] == pagos_antes
 
     def test_pago_factura_sin_credito_rechaza(self, mysql_connection, clean_db):
-        """Registrar pago en factura sin registro de crédito falla."""
+        """Registrar pago en factura sin registro de crédito falla.
+
+        El SP tiene un EXIT HANDLER que captura el SIGNAL y setea el
+        mensaje de error en el OUT p_mensaje. Verificamos el mensaje y
+        que no se haya creado un pago.
+        """
         cur = mysql_connection.cursor()
 
         cur.execute("""
@@ -276,7 +320,21 @@ class TestSpTrxRegistrarPago:
         cur.execute("SELECT LAST_INSERT_ID()")
         id_factura = cur.fetchone()[0]
 
+        # Contar pagos antes (debe ser 0)
+        cur.execute("SELECT COUNT(*) FROM pago WHERE id_factura_credito = %s", (id_factura,))
+        pagos_antes = cur.fetchone()[0]
+
         args = [id_factura, 500.00, "Efectivo", None, None, None, None]
-        with pytest.raises(mysql.connector.Error):
-            cur.callproc("sp_trx_registrar_pago", args)
-            mysql_connection.commit()
+        out = list(cur.callproc("sp_trx_registrar_pago", args))
+        for rs in cur.stored_results():
+            rs.fetchall()
+        mysql_connection.commit()
+
+        # El SP debe retornar mensaje de error
+        mensaje = out[6]
+        assert mensaje is not None
+        assert "Error" in mensaje or "error" in mensaje.lower()
+
+        # Y no se debe haber creado un pago
+        cur.execute("SELECT COUNT(*) FROM pago WHERE id_factura_credito = %s", (id_factura,))
+        assert cur.fetchone()[0] == pagos_antes
