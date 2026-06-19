@@ -150,12 +150,13 @@ END //
 -- ============================================================
 DROP PROCEDURE IF EXISTS sp_insertar_cliente //
 CREATE PROCEDURE sp_insertar_cliente(
-    IN p_nombre        VARCHAR(100),
-    IN p_razon_social  VARCHAR(150),
-    IN p_direccion     VARCHAR(500),
-    IN p_credito       BOOLEAN,
-    IN p_id_ruta       INT,
-    OUT p_id_cliente   INT
+    IN  p_nombre        VARCHAR(100),
+    IN  p_razon_social  VARCHAR(150),
+    IN  p_direccion     VARCHAR(500),
+    IN  p_credito       BOOLEAN,
+    IN  p_id_ruta       INT,
+    OUT p_id_cliente    INT,
+    OUT p_id_persona    INT
 )
 BEGIN
     DECLARE v_id_persona INT;
@@ -163,6 +164,7 @@ BEGIN
     BEGIN
         ROLLBACK;
         SET p_id_cliente = NULL;
+        SET p_id_persona = NULL;
     END;
 
     START TRANSACTION;
@@ -170,6 +172,7 @@ BEGIN
     INSERT INTO cliente (id_persona, id_ruta, razon_social, direccion_compuesta, credito_autorizado)
     VALUES (v_id_persona, p_id_ruta, TRIM(p_razon_social), p_direccion, p_credito);
     SET p_id_cliente = LAST_INSERT_ID();
+    SET p_id_persona = v_id_persona;
     COMMIT;
 END //
 
