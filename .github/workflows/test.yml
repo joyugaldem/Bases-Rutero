@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-mysql
+          pip install pytest
 
       - name: Bootstrap test database
         run: |
