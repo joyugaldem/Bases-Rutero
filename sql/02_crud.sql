@@ -740,7 +740,8 @@ CREATE PROCEDURE sp_consultar_factura_credito(IN p_id_factura INT)
 BEGIN
     SELECT fcc.id_factura, f.numero_factura, c.razon_social,
            f.total, fcc.saldo_pendiente,
-           fcc.fecha_vencimiento_credito, fcc.limite_credito_aplicado
+           fcc.fecha_vencimiento_credito AS vence_credito,
+           fcc.limite_credito_aplicado
     FROM factura_credito fcc
     JOIN factura f ON f.id_factura = fcc.id_factura
     JOIN cliente c ON c.id_cliente = f.id_cliente
@@ -809,6 +810,15 @@ CREATE PROCEDURE sp_insertar_venta(
 BEGIN
     INSERT INTO venta (id_factura, id_detalle, tipo_venta)
     VALUES (p_id_factura, p_id_detalle, p_tipo_venta);
+END //
+
+DROP PROCEDURE IF EXISTS sp_modificar_venta //
+CREATE PROCEDURE sp_modificar_venta(
+    IN p_id_venta  INT,
+    IN p_tipo_venta VARCHAR(20)
+)
+BEGIN
+    UPDATE venta SET tipo_venta = p_tipo_venta WHERE id_venta = p_id_venta;
 END //
 
 DROP PROCEDURE IF EXISTS sp_eliminar_venta //

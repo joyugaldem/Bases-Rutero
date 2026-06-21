@@ -97,7 +97,7 @@ def split_statements(filename, content):
         return result
 
 
-def get_connection():
+def get_connection(database=None):
     kwargs = {
         "host": config.DB_HOST,
         "port": config.DB_PORT,
@@ -106,9 +106,23 @@ def get_connection():
         "charset": "utf8mb4",
         "autocommit": False,
     }
-    if config.DB_NAME:
-        kwargs["database"] = config.DB_NAME
+    if database:
+        kwargs["database"] = database
     return mysql.connector.connect(**kwargs)
+
+
+def ensure_database():
+    """Crea la BD si no existe y retorna una conexión a ella."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        f"CREATE DATABASE IF NOT EXISTS `{config.DB_NAME}` "
+        "CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci"
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return get_connection(database=config.DB_NAME)
 
 
 def is_initialized(conn):
@@ -120,10 +134,10 @@ def is_initialized(conn):
 
 
 def run_bootstrap():
-    conn = get_connection()
+    conn = ensure_database()
 
     if is_initialized(conn):
-        print("lacteosdb ya tiene tablas. Bootstrapping omitido.")
+        print(f"{config.DB_NAME} ya tiene tablas. Bootstrapping omitido.")
         conn.close()
         return
 
