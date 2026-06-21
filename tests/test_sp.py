@@ -6,7 +6,12 @@ import pytest
 
 
 class TestSpInsertarCliente:
-    """Tests para sp_insertar_cliente."""
+    """Verifica `sp_insertar_cliente` (inserción transaccional persona+cliente).
+
+    Este SP crea un registro en `persona` y otro en `cliente` dentro de
+    una transacción. Si algo falla, hace rollback completo: no debe
+    quedar una `persona` huérfana sin su `cliente` correspondiente.
+    """
 
     def test_inserta_cliente_nuevo(self, mysql_connection, clean_db):
         """Inserta persona + cliente y retorna id_cliente válido."""
@@ -63,7 +68,18 @@ class TestSpTrxRegistrarPago:
     """Tests para sp_trx_registrar_pago."""
 
     def setup_productos_cliente(self, mysql_connection):
-        """Helper: crea producto, presentación, lote, cliente, factura crédito."""
+        """Crea el grafo mínimo necesario para probar `sp_trx_registrar_pago`.
+
+        Inserta en orden:
+            persona → cliente (con crédito)
+                  → repartidor → ruta → asignación → recorrido
+            producto → presentación → lote
+            factura (estado Pendiente) → factura_credito (saldo 1000)
+
+        Retorna el `id_factura` ya listo para que el SP le registre pagos.
+        El setup simula exactamente lo que `sp_trx_crear_factura_completa`
+        habría hecho al crear una factura a crédito en producción.
+        """
         cur = mysql_connection.cursor()
 
         cur.execute("""

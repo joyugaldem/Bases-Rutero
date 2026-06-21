@@ -23,6 +23,16 @@ PROC_FILES = {"02_crud.sql", "03_transacciones.sql", "05_triggers.sql",
 
 
 def get_connection():
+    """Abre una conexión MySQL usando la configuración de `config.py`.
+
+    Equivalente a `bootstrap_db.get_connection()` pero intencionalmente
+    incluye siempre `database=config.DB_NAME` porque aquí ya asumimos
+    que la BD existe (no es bootstrap inicial).
+
+    Returns:
+        mysql.connector.connection.MySQLConnection: conexión lista
+        con `autocommit=False` para controlar transacciones.
+    """
     kwargs = {
         "host": config.DB_HOST,
         "port": config.DB_PORT,
@@ -36,6 +46,28 @@ def get_connection():
 
 
 def run():
+    """Recrea procedures, triggers y SPs sin tocar datos.
+
+    Flujo:
+        1. DROP de todos los procedures y triggers existentes en el
+           schema actual (consultando `information_schema`).
+        2. Recorre los archivos SQL en `sql/` y reaplica solo los que
+           están en `PROC_FILES` (los que definen lógica, no schema
+           ni datos).
+        3. Commit por sentencia para que un fallo no bloquee las demás.
+
+    Use este script cuando:
+        - Modificás un stored procedure en `sql/02_crud.sql` o
+          `sql/03_transacciones.sql` y querés propagar el cambio sin
+          re-bootstrap (que sí borra datos).
+        - Tras un fix en bootstrap_db.py, para alinear los SPs ya
+          desplegados con la versión nueva.
+
+    Notes:
+        - No toca `01_schema.sql`, `04_vistas.sql` ni `08_datos_prueba.sql`.
+        - Si un DROP falla (permisos, FK referenciando) se ignora y se
+          continúa: el CREATE posterior puede sobrescribir de todos modos.
+    """
     conn = get_connection()
     cur = conn.cursor()
 

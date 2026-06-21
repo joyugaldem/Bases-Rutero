@@ -17,6 +17,16 @@ from sql_parser import split_statements
 
 
 def get_connection():
+    """Abre la conexión MySQL inicial sin asumir base de datos.
+
+    A diferencia de `recreate_stored_procs.get_connection`, aquí
+    `database` es opcional: el bootstrap inicial crea la BD si no
+    existe (`CREATE DATABASE IF NOT EXISTS`), por lo que la conexión
+    debe poder establecerse antes de que la BD esté disponible.
+
+    Returns:
+        mysql.connector.connection.MySQLConnection: con `autocommit=False`.
+    """
     kwargs = {
         "host": config.DB_HOST,
         "port": config.DB_PORT,
@@ -31,6 +41,19 @@ def get_connection():
 
 
 def is_initialized(conn):
+    """Indica si el schema ya fue cargado (hay tablas).
+
+    Se usa como guarda para evitar ejecutar DDL dos veces: si el
+    usuario ya corrió bootstrap, las sentencias `CREATE TABLE`
+    fallarían con "table already exists". Mejor saltear todo el
+    proceso y avisar.
+
+    Args:
+        conn: conexión MySQL abierta.
+
+    Returns:
+        bool: True si `SHOW TABLES` devuelve al menos una fila.
+    """
     cur = conn.cursor()
     cur.execute("SHOW TABLES")
     tables = cur.fetchall()
@@ -39,6 +62,28 @@ def is_initialized(conn):
 
 
 def run_bootstrap():
+    """Inicializa la BD desde cero cargando todos los archivos `sql/`.
+
+    Flujo:
+        1. Conecta a MySQL.
+        2. Si ya hay tablas, sale sin hacer nada (skip idempotente).
+        3. Ordena los `*.sql` alfabéticamente y los ejecuta en orden:
+              01_schema → 02_crud → 03_transacciones → 04_vistas
+              → 05_triggers → 06_cursores → 07_consultas → 08_datos
+        4. Cada sentencia se commitea individualmente para que un
+           fallo (ej.: DROP de tabla inexistente) no aborte el resto.
+
+    Tolerancia a errores:
+        - "Duplicate entry" / "database exists" se ignoran (es normal
+          en re-ejecuciones parciales).
+        - Otros errores se imprimen pero no detienen el script.
+
+    Uso:
+        $ python scripts/bootstrap_db.py
+
+    Variables de entorno (de config.py):
+        DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME.
+    """
     conn = get_connection()
 
     if is_initialized(conn):

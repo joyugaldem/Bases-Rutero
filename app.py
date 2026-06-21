@@ -169,7 +169,18 @@ def paginate(items, per_page=20):
 
 @app.route("/")
 def index():
-    """Página de inicio con resumen del sistema."""
+    """Página de inicio con resumen del sistema.
+
+    Muestra cuatro contadores: productos activos, clientes activos,
+    rutas activas y facturas pendientes de pago (crédito con saldo).
+
+    Si la BD no responde, no rompe: captura la excepción y muestra
+    ceros en lugar de un 500, para que la app siga siendo navegable
+    aunque el backend de datos esté caído.
+
+    Template:
+        index.html
+    """
     empty = {"productos": 0, "clientes": 0, "rutas": 0, "pendientes": 0}
     try:
         row = query("""
@@ -191,6 +202,23 @@ def index():
 
 @app.route("/productos")
 def productos_lista():
+    """Lista los productos con búsqueda y paginación server-side.
+
+    Query params:
+        q: texto a buscar en nombre_comercial, codigo_barras o categoria
+           (case-insensitive, match parcial).
+        page: número de página (default 1, ver paginate()).
+
+    El filtrado se hace en Python (no en SQL) porque la lista ya
+    viene del SP `sp_consultar_productos(NULL)`; para conjuntos
+    grandes se recomienda mover el filtro a SQL.
+
+    SPs:
+        sp_consultar_productos(NULL)
+
+    Template:
+        productos/index.html
+    """
     rows = call_proc("sp_consultar_productos", [None])
     all_items = rows[0] if rows else []
     q = (request.args.get("q") or "").strip().lower()
@@ -206,6 +234,22 @@ def productos_lista():
 
 @app.route("/productos/nuevo", methods=["GET", "POST"])
 def productos_nuevo():
+    """Crea un producto (GET muestra form, POST persiste).
+
+    Form (POST):
+        nombre: nombre comercial (obligatorio, no vacío).
+        codigo_barras: EAN-13 u otro (validado en SQL: único y sin
+                       espacios).
+        categoria: una de constants.CATEGORIAS_PRODUCTO.
+
+    SPs:
+        sp_insertar_producto → devuelve id_producto (OUT).
+
+    Template:
+        productos/form.html (con categorías en el dropdown).
+
+    Efectos: flash + redirect a /productos/<id> tras éxito.
+    """
     if request.method == "POST":
         try:
             _, out = call_proc_named(
@@ -223,6 +267,23 @@ def productos_nuevo():
 
 @app.route("/productos/<int:id>")
 def producto_detalle(id):
+    """Detalle de un producto con sus presentaciones y lotes.
+
+    Args:
+        id: id_producto (path int).
+
+    SPs:
+        sp_consultar_productos(id)
+        sp_consultar_presentaciones(id_producto)
+        sp_consultar_lotes(id_producto)
+
+    Template:
+        productos/detail.html (muestra stock por lote, presentaciones
+        activas, y permite agregar nueva presentación/lote).
+
+    Efectos: si el producto no existe, flash warning + redirect a
+    /productos.
+    """
     prod = call_proc("sp_consultar_productos", [id])
     if not prod or not prod[0]:
         flash("Producto no encontrado.", "warning")
@@ -237,6 +298,21 @@ def producto_detalle(id):
 
 @app.route("/productos/<int:id>/editar", methods=["GET", "POST"])
 def producto_editar(id):
+    """Edita nombre, código de barras, categoría y estado.
+
+    Form (POST):
+        nombre, codigo_barras, categoria, estado (Activo/Inactivo/
+        Descontinuado).
+
+    SPs:
+        sp_modificar_producto (5 IN).
+        sp_consultar_productos(id) — solo para prellenar el form en GET.
+
+    Template:
+        productos/form.html (con producto en contexto + estados).
+
+    Efectos: flash + redirect a /productos/<id> tras éxito.
+    """
     if request.method == "POST":
         try:
             call_proc("sp_modificar_producto", [
@@ -260,6 +336,17 @@ def producto_editar(id):
 
 @app.route("/productos/<int:id>/eliminar", methods=["POST"])
 def producto_eliminar(id):
+    """Elimina (o descontinúa) un producto.
+
+    Solo POST. El form se muestra en un modal de confirmación
+    (ver macro `confirm_delete`). CSRF validado por Flask-WTF.
+
+    SPs:
+        sp_eliminar_producto — si tiene ventas, hace borrado lógico
+        (cambia estado a 'Descontinuado'); si no, borrado físico.
+
+    Efectos: flash + redirect a /productos.
+    """
     try:
         call_proc("sp_eliminar_producto", [id])
         flash("Producto eliminado/descontinuado.", "info")
@@ -273,6 +360,25 @@ def producto_eliminar(id):
 @app.route("/presentaciones/nueva/<int:id_producto>", methods=["GET", "POST"])
 @handle_form_errors
 def presentacion_nueva(id_producto):
+    """Crea una presentación (tamaño + precio) para un producto.
+
+    Args:
+        id_producto: producto padre (path int).
+
+    Form (POST):
+        tamano: varchar(20), ej. "1", "500", "1.5".
+        unidad_medida: ml | L | g | kg | Unidad.
+        precio_venta: decimal(>0).
+        descripcion: opcional.
+
+    SPs:
+        sp_insertar_presentacion (5 IN + 1 OUT id_presentacion).
+
+    Template:
+        productos/form_presentacion.html.
+
+    Efectos: redirige al detalle del producto tras éxito.
+    """
     if request.method == "POST":
         try:
             call_proc_named(
@@ -302,6 +408,29 @@ def presentacion_nueva(id_producto):
 @app.route("/lotes/nuevo/<int:id_producto>", methods=["GET", "POST"])
 @handle_form_errors
 def lote_nuevo(id_producto):
+    """Crea un lote con stock inicial para un producto.
+
+    Args:
+        id_producto: producto padre (path int).
+
+    Form (POST):
+        numero_lote: identificador de lote del fabricante.
+        fecha_elaboracion, fecha_vencimiento: ISO date.
+        cantidad: unidades producidas (= disponibles al inicio).
+
+    SPs:
+        sp_insertar_lote (5 IN + 1 OUT id_lote).
+
+    Template:
+        productos/form_lote.html.
+
+    Notes:
+        El trigger `trg_detalle_after_insert` descontará stock cuando
+        se venda. Este SP solo crea el lote; las ventas se controlan
+        desde el módulo de facturación.
+
+    Efectos: redirige al detalle del producto tras éxito.
+    """
     if request.method == "POST":
         try:
             call_proc_named(
@@ -330,6 +459,17 @@ def lote_nuevo(id_producto):
 
 @app.route("/clientes")
 def clientes_lista():
+    """Lista los clientes con búsqueda y paginación.
+
+    Query params:
+        q: texto a buscar en razon_social, nombre o ruta_nombre.
+
+    SPs:
+        sp_consultar_clientes(NULL)
+
+    Template:
+        clientes/index.html
+    """
     rows = call_proc("sp_consultar_clientes", [None])
     all_items = rows[0] if rows else []
     q = (request.args.get("q") or "").strip().lower()
@@ -345,6 +485,31 @@ def clientes_lista():
 
 @app.route("/clientes/nuevo", methods=["GET", "POST"])
 def cliente_nuevo():
+    """Crea un cliente (persona + cliente + teléfono opcional).
+
+    Form (POST):
+        nombre: nombre de la persona de contacto.
+        razon_social: nombre comercial / jurídico del cliente.
+        direccion: dirección de entrega (direccion_compuesta).
+        credito: "1" si tiene crédito autorizado, ausente si no.
+        id_ruta: ruta de distribución asignada (opcional).
+        telefono: número en formato XXXX-XXXX (opcional).
+        tipo_telefono: Móvil | Fijo | WhatsApp (default Móvil).
+
+    SPs:
+        sp_insertar_cliente (5 IN + 2 OUT: id_cliente, id_persona).
+        sp_insertar_telefono (3 IN) — solo si se proporcionó teléfono.
+
+    Notes:
+        El cliente y la persona se crean atómicamente dentro del SP
+        (transactional). El teléfono se inserta en una llamada
+        separada porque no todas las personas tienen.
+
+    Template:
+        clientes/form.html (con rutas en el dropdown).
+
+    Efectos: flash + redirect a /clientes tras éxito.
+    """
     if request.method == "POST":
         try:
             _, out = call_proc_named(
@@ -377,6 +542,24 @@ def cliente_nuevo():
 
 @app.route("/clientes/<int:id>")
 def cliente_detalle(id):
+    """Detalle del cliente: teléfonos + facturas emitidas.
+
+    Args:
+        id: id_cliente.
+
+    SPs:
+        sp_consultar_clientes(id) → incluye id_persona desde fase 3.
+        sp_consultar_telefonos(id_persona).
+        sp_consultar_facturas(id_cliente, NULL, NULL) — todas las facturas.
+
+    Template:
+        clientes/detail.html (cards de info + tabla de facturas).
+
+    Notes:
+        Antes este endpoint hacía un SELECT extra sobre `persona` para
+        obtener `id_persona`. Ahora el SP lo retorna directamente,
+        eliminando un round-trip.
+    """
     rows = call_proc_dict("sp_consultar_clientes", [id])
     if not rows:
         flash("Cliente no encontrado.", "warning")
@@ -393,6 +576,21 @@ def cliente_detalle(id):
 
 @app.route("/clientes/<int:id>/editar", methods=["GET", "POST"])
 def cliente_editar(id):
+    """Edita los datos editables de un cliente.
+
+    Form (POST):
+        nombre, razon_social, direccion, credio ("1"/ausente),
+        id_ruta (opcional), estado.
+
+    SPs:
+        sp_modificar_cliente (6 IN).
+        sp_consultar_clientes(id), sp_consultar_rutas(NULL) — solo GET.
+
+    Template:
+        clientes/form.html.
+
+    Efectos: flash + redirect a /clientes/<id>.
+    """
     if request.method == "POST":
         try:
             call_proc("sp_modificar_cliente", [
@@ -419,6 +617,14 @@ def cliente_editar(id):
 
 @app.route("/clientes/<int:id>/eliminar", methods=["POST"])
 def cliente_eliminar(id):
+    """Desactiva un cliente (borrado lógico por defecto).
+
+    SPs:
+        sp_eliminar_cliente — si tiene facturas, solo cambia estado a
+        'Inactivo' (borrado lógico); si no tiene, borrado físico.
+
+    Efectos: flash + redirect a /clientes.
+    """
     try:
         call_proc("sp_eliminar_cliente", [id])
         flash("Cliente eliminado.", "info")
@@ -433,12 +639,35 @@ def cliente_eliminar(id):
 
 @app.route("/rutas")
 def rutas_lista():
+    """Lista todas las rutas de distribución.
+
+    SPs:
+        sp_consultar_rutas(NULL).
+
+    Template:
+        rutas/index.html.
+    """
     rutas = call_proc("sp_consultar_rutas", [None])
     return render_template("rutas/index.html", rutas=rutas[0] if rutas else [])
 
 
 @app.route("/rutas/nueva", methods=["GET", "POST"])
 def ruta_nueva():
+    """Crea una ruta de distribución.
+
+    Form (POST):
+        nombre: nombre de la ruta (validado no vacío en SQL).
+        zona_geografica: zona/región cubierta.
+        descripcion: opcional.
+
+    SPs:
+        sp_insertar_ruta (3 IN + 1 OUT id_ruta).
+
+    Template:
+        rutas/form.html.
+
+    Efectos: flash + redirect a /rutas.
+    """
     if request.method == "POST":
         try:
             call_proc_named(
@@ -459,6 +688,21 @@ def ruta_nueva():
 
 @app.route("/rutas/<int:id>")
 def ruta_detalle(id):
+    """Detalle de ruta con asignaciones y recorridos históricos.
+
+    Args:
+        id: id_ruta.
+
+    SPs:
+        sp_consultar_rutas(id).
+        sp_consultar_asignaciones(id_ruta, NULL).
+        sp_consultar_recorridos(id_ruta, NULL).
+
+    Template:
+        rutas/detail.html.
+
+    Efectos: si la ruta no existe, flash + redirect a /rutas.
+    """
     rutas = call_proc("sp_consultar_rutas", [id])
     if not rutas or not rutas[0]:
         flash("Ruta no encontrada.", "warning")
@@ -473,6 +717,20 @@ def ruta_detalle(id):
 
 @app.route("/rutas/<int:id>/editar", methods=["GET", "POST"])
 def ruta_editar(id):
+    """Edita nombre, zona, descripción y estado de una ruta.
+
+    Form (POST):
+        nombre, zona_geografica, descripcion (opcional), estado.
+
+    SPs:
+        sp_modificar_ruta (4 IN).
+        sp_consultar_rutas(id) — solo GET.
+
+    Template:
+        rutas/form.html.
+
+    Efectos: flash + redirect a /rutas/<id>.
+    """
     if request.method == "POST":
         try:
             call_proc("sp_modificar_ruta", [
@@ -495,6 +753,14 @@ def ruta_editar(id):
 
 @app.route("/rutas/<int:id>/eliminar", methods=["POST"])
 def ruta_eliminar(id):
+    """Desactiva una ruta.
+
+    SPs:
+        sp_eliminar_ruta — equivalente a poner estado 'Inactiva' si
+        tiene recorridos asociados.
+
+    Efectos: flash + redirect a /rutas.
+    """
     try:
         call_proc("sp_eliminar_ruta", [id])
         flash("Ruta eliminada.", "info")
@@ -508,6 +774,26 @@ def ruta_eliminar(id):
 @app.route("/recorridos/nuevo", methods=["GET", "POST"])
 @handle_form_errors
 def recorrido_nuevo():
+    """Crea un recorrido (turno de entrega en una fecha).
+
+    Form (POST):
+        id_ruta, id_repartidor (int), fecha (opcional, default hoy),
+        turno: Mañana | Tarde | Noche.
+
+    SPs:
+        sp_trx_crear_recorrido (4 IN + 2 OUT: id_recorrido, mensaje).
+        sp_consultar_rutas(NULL), sp_consultar_repartidores(NULL) — solo GET.
+
+    Notes:
+        El SP valida que repartidor y ruta estén activos. Si no hay
+        asignación activa para esa combinación, la crea automáticamente.
+
+    Template:
+        rutas/form_recorrido.html.
+
+    Efectos: usa `flash_out` para interpretar el prefijo "OK:" del OUT
+    `mensaje` como éxito; redirige a /rutas/<id> tras crear.
+    """
     if request.method == "POST":
         try:
             id_ruta = form_get("id_ruta", int)
@@ -537,12 +823,33 @@ def recorrido_nuevo():
 
 @app.route("/repartidores")
 def repartidores_lista():
+    """Lista todos los repartidores.
+
+    SPs:
+        sp_consultar_repartidores(NULL).
+
+    Template:
+        repartidores/index.html.
+    """
     rows = call_proc("sp_consultar_repartidores", [None])
     return render_template("repartidores/index.html", repartidores=rows[0] if rows else [])
 
 
 @app.route("/repartidores/nuevo", methods=["GET", "POST"])
 def repartidor_nuevo():
+    """Crea un repartidor (persona + licencia).
+
+    Form (POST):
+        nombre, licencia (no vacía, validada en SQL).
+
+    SPs:
+        sp_insertar_repartidor (2 IN + 1 OUT id_repartidor).
+
+    Template:
+        repartidores/form.html.
+
+    Efectos: flash + redirect a /repartidores.
+    """
     if request.method == "POST":
         try:
             call_proc_named(
@@ -559,6 +866,20 @@ def repartidor_nuevo():
 
 @app.route("/repartidores/<int:id>/editar", methods=["GET", "POST"])
 def repartidor_editar(id):
+    """Edita nombre, licencia y estado de un repartidor.
+
+    Form (POST):
+        nombre, licencia, estado (Activo | Inactivo | Suspendido).
+
+    SPs:
+        sp_modificar_repartidor (3 IN).
+        sp_consultar_repartidores(id) — solo GET.
+
+    Template:
+        repartidores/form.html.
+
+    Efectos: flash + redirect a /repartidores.
+    """
     if request.method == "POST":
         try:
             call_proc("sp_modificar_repartidor", [
@@ -580,6 +901,13 @@ def repartidor_editar(id):
 
 @app.route("/repartidores/<int:id>/eliminar", methods=["POST"])
 def repartidor_eliminar(id):
+    """Desactiva un repartidor.
+
+    SPs:
+        sp_eliminar_repartidor — equivalente a 'Inactivo'.
+
+    Efectos: flash + redirect a /repartidores.
+    """
     try:
         call_proc("sp_eliminar_repartidor", [id])
         flash("Repartidor eliminado.", "info")
@@ -594,6 +922,23 @@ def repartidor_eliminar(id):
 
 @app.route("/facturacion")
 def facturacion_lista():
+    """Lista facturas con filtros por cliente y rango de fechas.
+
+    Query params:
+        desde, hasta: fechas ISO (YYYY-MM-DD), opcionales.
+        cliente: id_cliente, opcional.
+        page: paginación (default 1).
+
+    SPs:
+        sp_consultar_facturas(id_cliente, desde, hasta).
+
+    Template:
+        facturacion/index.html (con dropdown de clientes para filtro).
+
+    Notes:
+        La paginación se hace en memoria sobre el resultado del SP;
+        si el volumen crece conviene mover LIMIT/OFFSET al SP.
+    """
     fecha_desde = request.args.get("desde") or None
     fecha_hasta = request.args.get("hasta") or None
     id_cliente  = request.args.get("cliente") or None
@@ -611,6 +956,34 @@ def facturacion_lista():
 @app.route("/facturacion/nueva", methods=["GET", "POST"])
 @handle_form_errors
 def factura_nueva():
+    """Crea una factura (Contado o Crédito).
+
+    Form (POST):
+        id_cliente, id_repartidor, id_recorrido (ints).
+        condicion_pago: Contado | Crédito.
+        id_presentacion, id_lote (ints).
+        cantidad (int > 0).
+        monto_recibido (float): solo Contado.
+        fecha_vencimiento_credito, limite_credito: solo Crédito.
+
+    SPs:
+        sp_trx_crear_factura_completa (10 IN + 3 OUT: id_factura,
+        numero_factura, mensaje).
+        sp_consultar_clientes/repartidores/recorridos + vista_catalogo
+        solo para popular el form (GET).
+
+    Notes:
+        Los campos específicos de Contado/Crédito se pasan como None
+        cuando no aplican (el SP los ignora según `p_condicion_pago`).
+        Validaciones críticas (stock, crédito autorizado, fechas) se
+        hacen en el SP, no en el endpoint.
+
+    Template:
+        facturacion/nueva.html (con JS que muestra/oculta campos según
+        condición de pago y autocompleta lote desde la presentación).
+
+    Efectos: redirige a /facturacion/<id> tras éxito.
+    """
     if request.method == "POST":
         try:
             id_cliente      = form_get("id_cliente", int)
@@ -654,6 +1027,23 @@ def factura_nueva():
 
 @app.route("/facturacion/<int:id>")
 def factura_detalle(id):
+    """Detalle completo de una factura: encabezado, ítems, pagos, crédito.
+
+    Args:
+        id: id_factura.
+
+    SPs:
+        sp_consultar_factura(id) → encabezado.
+        sp_consultar_detalles(id) → líneas de producto.
+        sp_consultar_pagos(id) → pagos parciales (si es crédito).
+        sp_consultar_factura_credito(id) → saldo + vencimiento.
+
+    Template:
+        facturacion/detalle.html (cuatro cards: info, crédito, pagos,
+        detalle de productos + acciones condicionales según estado).
+
+    Efectos: si la factura no existe, flash + redirect.
+    """
     rows     = call_proc("sp_consultar_factura", [id])
     factura  = rows[0][0] if rows and rows[0] else None
     if not factura:
@@ -672,6 +1062,29 @@ def factura_detalle(id):
 @app.route("/facturacion/<int:id>/pagar", methods=["GET", "POST"])
 @handle_form_errors
 def factura_pagar(id):
+    """Registra un pago parcial o total de una factura a crédito.
+
+    Form (POST):
+        monto (float > 0, <= saldo).
+        metodo_pago: Efectivo | Transferencia | SINPE | Cheque.
+        comprobante: número/texto opcional.
+
+    SPs:
+        sp_trx_registrar_pago (4 IN + 3 OUT: id_pago, saldo_restante,
+        mensaje).
+        sp_consultar_factura_credito(id) — solo GET, para mostrar el
+        saldo pendiente en el form.
+
+    Notes:
+        El trigger `trg_pago_after_insert` actualiza automáticamente
+        el saldo y, si llega a 0, marca la factura como 'Pagada'. El
+        SP solo lee el saldo resultante para devolverlo al cliente.
+
+    Template:
+        facturacion/pago.html.
+
+    Efectos: flash + redirect a /facturacion/<id>.
+    """
     if request.method == "POST":
         try:
             _, out = call_proc_named(
@@ -696,6 +1109,21 @@ def factura_pagar(id):
 
 @app.route("/facturacion/<int:id>/anular", methods=["POST"])
 def factura_anular(id):
+    """Anula una factura (restaura stock vía cursor; solo si es válida).
+
+    Args:
+        id: id_factura.
+
+    SPs:
+        sp_trx_anular_factura (1 IN + 1 OUT mensaje).
+
+    Notas de negocio:
+        - Solo se permite si estado IN ('Emitida', 'Pendiente').
+        - Si es Crédito con pagos, se rechaza (hay que reversar pagos
+          primero; ver README "Troubleshooting").
+
+    Efectos: flash + redirect a /facturacion/<id>.
+    """
     try:
         _, out = call_proc_named(
             "sp_trx_anular_factura",
@@ -710,6 +1138,13 @@ def factura_anular(id):
 
 @app.route("/facturacion/<int:id>/eliminar", methods=["POST"])
 def factura_eliminar(id):
+    """Alias histórico de `factura_anular` (mismo SP, distinto template).
+
+    Conservado por compatibilidad con templates antiguos que usan
+    `/eliminar` en lugar de `/anular`. La semántica es idéntica:
+    marca la factura como 'Anulada' y restaura stock. No es borrado
+    físico.
+    """
     try:
         _, out = call_proc_named(
             "sp_trx_anular_factura",
@@ -728,6 +1163,18 @@ def factura_eliminar(id):
 
 @app.route("/reportes/ventas-por-ruta")
 def rpt_ventas_ruta():
+    """Reporte de ventas agrupadas por ruta y fecha.
+
+    Query params:
+        desde, hasta: fechas ISO, opcionales (sin filtro = todas las
+                      ventas).
+
+    SPs:
+        sp_rpt_ventas_por_ruta(desde, hasta).
+
+    Template:
+        reportes/ventas_ruta.html.
+    """
     desde = request.args.get("desde") or None
     hasta = request.args.get("hasta") or None
     rows  = call_proc("sp_rpt_ventas_por_ruta", [desde, hasta])
@@ -738,6 +1185,15 @@ def rpt_ventas_ruta():
 
 @app.route("/reportes/creditos")
 def rpt_creditos():
+    """Resumen de clientes con créditos pendientes (cálculo con cursor).
+
+    SPs:
+        sp_cur_resumen_creditos — recorre clientes con deudas, calcula
+        total adeudado y factura más antigua, vuelca a tabla temporal.
+
+    Template:
+        reportes/creditos.html.
+    """
     rows = call_proc("sp_cur_resumen_creditos")
     return render_template("reportes/creditos.html",
                            datos=rows[0] if rows else [])
@@ -745,6 +1201,17 @@ def rpt_creditos():
 
 @app.route("/reportes/productos-por-vencer")
 def rpt_productos_vencer():
+    """Lotes cuya fecha de vencimiento está dentro de N días.
+
+    Query params:
+        dias: ventana en días (default 30).
+
+    SPs:
+        sp_rpt_productos_proximos_vencer(dias).
+
+    Template:
+        reportes/productos_vencer.html.
+    """
     dias = int(request.args.get("dias", 30))
     rows = call_proc("sp_rpt_productos_proximos_vencer", [dias])
     return render_template("reportes/productos_vencer.html",
@@ -753,6 +1220,18 @@ def rpt_productos_vencer():
 
 @app.route("/reportes/top-productos")
 def rpt_top_productos():
+    """Productos más vendidos por cantidad en un rango de fechas.
+
+    Query params:
+        desde, hasta: fechas ISO, opcionales.
+
+    SPs:
+        sp_rpt_top_productos_vendidos(desde, hasta, NULL). El último
+        NULL es el id_cliente (para top por cliente específico).
+
+    Template:
+        reportes/top_productos.html.
+    """
     desde = request.args.get("desde") or None
     hasta = request.args.get("hasta") or None
     rows  = call_proc("sp_rpt_top_productos_vendidos", [desde, hasta, None])

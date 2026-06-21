@@ -24,6 +24,25 @@ if not HOST or HOST == "localhost" and not os.environ.get("DB_HOST"):
 
 
 def main():
+    """Aplica todos los archivos `sql/*.sql` al destino configurado.
+
+    Pensado para deploy a Railway (o cualquier MySQL remoto) usando las
+    variables `APPLY_DB_*` con fallback a `DB_*`. A diferencia de
+    `bootstrap_db.py`, aquí se ejecuta contra una BD que se asume ya
+    creada y vacía de lógica (o con lógica previa que se sobreescribe).
+
+    Diferencias clave vs. bootstrap_db:
+        - Conexión con `autocommit=True` (no hay transacciones largas).
+        - Lee `APPLY_DB_*` primero, luego `DB_*`, luego defaults.
+        - No skipea si hay tablas: la idea es "aplicar otra vez" los
+          archivos, sobrescribiendo SPs, vistas, etc.
+
+    Errores tolerados (skip silencioso):
+        - "already exists" / "duplicate" / "database exists".
+
+    Uso típico con Railway:
+        $ railway run python scripts/apply_procs.py
+    """
     conn = mysql.connector.connect(
         host=HOST, port=PORT, user=USER, password=PASSWORD,
         database=DB, charset="utf8mb4", autocommit=True

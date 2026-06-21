@@ -12,12 +12,28 @@ import pytest
 
 
 class TestFacturaContadoCompleta:
-    """Tests para sp_trx_crear_factura_completa con condición Contado."""
+    """Verifica `sp_trx_crear_factura_completa` end-to-end.
+
+    Cubre los tres caminos críticos del SP:
+        - Factura contado: descuenta stock, marca Pagada, registra venta.
+        - Factura crédito: marca Pendiente, crea registro en factura_credito.
+        - Stock insuficiente: rechaza sin crear factura.
+
+    Estos tests son la red de seguridad de la lógica de negocio: si
+    rompes el SP, las facturas o el stock van a quedar inconsistentes.
+    """
 
     def _setup_minimo(self, cur):
-        """Crea persona+cliente+repartidor+ruta+recorrido+producto+presentacion+lote.
+        """Crea el grafo mínimo para invocar `sp_trx_crear_factura_completa`.
 
-        Retorna dict con los IDs generados.
+        Inserta persona+cliente+repartidor+ruta+recorrido+producto+
+        presentación+lote con datos válidos (FKs respetadas, lotes con
+        stock). Devuelve los IDs en un dict para que cada test arme los
+        argumentos del SP.
+
+        Returns:
+            dict: id_cliente, id_repartidor, id_recorrido, id_presentacion,
+            id_lote, id_producto.
         """
         # Cliente con crédito autorizado (necesario para el trigger
         # trg_factura_credito_before_insert, no para contado pero lo
@@ -206,16 +222,23 @@ class TestFacturaContadoCompleta:
 
 
 class TestAnularFacturaRestauraStock:
-    """Tests para sp_trx_anular_factura: restaura stock y elimina crédito."""
+    """Verifica `sp_trx_anular_factura` (rollback de stock vía cursor).
+
+    El SP usa un cursor sobre `detalle_factura` para restaurar el stock
+    lote por lote y luego marca la factura como 'Anulada'. Este test
+    confirma el efecto neto: stock_inicial - stock_post_anulación = 0
+    para los lotes involucrados.
+    """
 
     def _setup_para_anular(self, cur):
-        """Helper: crea una factura en estado 'Emitida' con su detalle,
-        presentación, lote y stock descontado manualmente.
+        """Crea una factura en estado 'Emitida' con stock ya descontado.
 
-        sp_trx_crear_factura_completa siempre termina una factura
-        Contado como 'Pagada' (que NO es anulable per sp_trx_anular_factura).
-        Para poder probar la anulación, creamos la factura con estado
-        inicial 'Emitida' directamente.
+        `sp_trx_crear_factura_completa` siempre termina una factura
+        Contado como 'Pagada' (que NO es anulable según
+        `sp_trx_anular_factura`). Para poder probar la anulación,
+        creamos la factura con estado inicial 'Emitida' directamente
+        e insertamos el detalle a mano (lo que dispara el trigger de
+        descuento de stock).
         """
         cur.execute("INSERT INTO persona (nombre) VALUES ('Cli A')")
         id_persona = cur.lastrowid
@@ -341,9 +364,20 @@ class TestAnularFacturaRestauraStock:
 
 
 class TestCrearRecorrido:
-    """Tests para sp_trx_crear_recorrido."""
+    """Verifica `sp_trx_crear_recorrido` (validación + auto-asignación).
+
+    El SP valida que repartidor y ruta estén 'Activos', y si no existe
+    asignación activa para esa combinación, la crea automáticamente
+    antes de generar el recorrido. Esto evita que el usuario tenga que
+    registrar la asignación por separado.
+    """
 
     def _setup_repartidor_ruta(self, cur):
+        """Helper mínimo: inserta repartidor (Activo) y ruta (Activa).
+
+        Returns:
+            tuple[int, int]: (id_repartidor, id_ruta).
+        """
         cur.execute("INSERT INTO persona (nombre) VALUES ('Rep R')")
         id_persona = cur.lastrowid
         cur.execute(

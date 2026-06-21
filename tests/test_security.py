@@ -15,7 +15,22 @@ from app import app
 
 
 def _extract_csrf_token(html: str) -> str:
-    """Extrae el valor del csrf_token del HTML renderizado."""
+    """Extrae el valor del input `csrf_token` del HTML renderizado.
+
+    El macro `csrf_input()` genera `<input name="csrf_token" value="...">`.
+    Flask-WTF también emite el token en `<meta>` para JS, pero solo el
+    input hidden es lo que llega al POST del form.
+
+    Args:
+        html: contenido HTML renderizado por un GET a un form.
+
+    Returns:
+        str: valor del token CSRF (string firmado de >40 chars).
+
+    Raises:
+        AssertionError: si el input no está presente (macro no usado
+        o template mal renderizado).
+    """
     m = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', html)
     if not m:
         m = re.search(r'value="([^"]+)"[^>]*name="csrf_token"', html)
@@ -29,6 +44,12 @@ def _require_db():
     Los POSTs a /productos/nuevo invocan sp_insertar_producto; sin
     MySQL esos tests devuelven 200 (form con flash de error) en lugar
     de 302, lo que no refleja un fallo de CSRF sino de infraestructura.
+    Esta función encapsula el chequeo para que `pytest.skip` se
+    invoque con el mismo mensaje en todos los tests dependientes.
+
+    Variables de entorno esperadas:
+        TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER, TEST_DB_PASSWORD,
+        TEST_DB_NAME (con defaults localhost:3306/root/test/lacteosdb).
     """
     import mysql.connector
     host = os.environ.get("TEST_DB_HOST", "localhost")
@@ -51,7 +72,19 @@ def _require_db():
 
 
 class TestCsrfProtection:
-    """Tests para la protección CSRF de formularios POST."""
+    """Verifica que Flask-WTF rechaza POSTs sin token válido.
+
+    Cubre los cuatro escenarios del macro `csrf_input()`:
+        1. El GET del form incluye el token oculto.
+        2. POST sin token → 400.
+        3. POST con token inventado → 400 (firma inválida).
+        4. POST con token válido → 302 (éxito).
+        5. AJAX POST con header `X-CSRFToken` → 302 (camino alternativo).
+
+    Los tests (4) y (5) requieren MySQL porque el endpoint llama al
+    stored procedure `sp_insertar_producto`; `_require_db()` los
+    skippea si la BD no está disponible.
+    """
 
     def test_get_form_incluye_csrf_token(self):
         """GET a un form POST debe incluir el input csrf_token oculto."""
@@ -116,7 +149,13 @@ class TestCsrfProtection:
 
 
 class TestSecurityHeaders:
-    """Tests para headers de seguridad en respuestas HTTP."""
+    """Verifica que el hook `add_security_headers` añade los headers correctos.
+
+    Estos headers mitigan ataques comunes:
+        - X-Content-Type-Options: evita MIME sniffing.
+        - X-Frame-Options: previene clickjacking (no se puede iframear).
+        - Referrer-Policy: controla qué URL se envía al navegar fuera.
+    """
 
     def test_x_content_type_options(self):
         with app.test_client() as c:
@@ -135,7 +174,12 @@ class TestSecurityHeaders:
 
 
 class TestSecretKeyRequired:
-    """Tests para la exigencia de SECRET_KEY en config."""
+    """Verifica que config.py exige SECRET_KEY (no usa defaults inseguros).
+
+    Sin SECRET_KEY, Flask-WTF no puede firmar el CSRF token ni cifrar
+    las sesiones. Forzar la variable evita que un deploy olvide
+    configurarla y deje la app vulnerable.
+    """
 
     def test_secret_key_sin_variable_falla(self, monkeypatch):
         """Sin SECRET_KEY en env, importar config debe fallar."""
