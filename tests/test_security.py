@@ -23,6 +23,33 @@ def _extract_csrf_token(html: str) -> str:
     return m.group(1)
 
 
+def _require_db():
+    """Salta los tests que necesitan DB si MySQL no responde.
+
+    Los POSTs a /productos/nuevo invocan sp_insertar_producto; sin
+    MySQL esos tests devuelven 200 (form con flash de error) en lugar
+    de 302, lo que no refleja un fallo de CSRF sino de infraestructura.
+    """
+    import mysql.connector
+    host = os.environ.get("TEST_DB_HOST", "localhost")
+    port = int(os.environ.get("TEST_DB_PORT", "3306"))
+    user = os.environ.get("TEST_DB_USER", "root")
+    pwd  = os.environ.get("TEST_DB_PASSWORD", "test")
+    name = os.environ.get("TEST_DB_NAME", "lacteosdb")
+    try:
+        conn = mysql.connector.connect(
+            host=host, port=port, user=user, password=pwd,
+            database=name, charset="utf8mb4",
+            connection_timeout=3,
+        )
+        conn.close()
+    except Exception:
+        pytest.skip(
+            f"MySQL no disponible en {host}:{port}/{name}. "
+            "Levanta MySQL o ajusta las variables TEST_DB_*"
+        )
+
+
 class TestCsrfProtection:
     """Tests para la protección CSRF de formularios POST."""
 
@@ -46,6 +73,7 @@ class TestCsrfProtection:
 
     def test_post_con_token_es_aceptado(self):
         """POST con csrf_token válido (obtenido de GET previo) es aceptado."""
+        _require_db()
         import uuid
         codigo = f"CSRF-{uuid.uuid4().hex[:8]}"  # único por run
         with app.test_client() as c:
@@ -74,6 +102,7 @@ class TestCsrfProtection:
 
     def test_ajax_post_puede_usar_header_csrf(self):
         """POSTs con header X-CSRFToken (típico de AJAX) también son aceptados."""
+        _require_db()
         import uuid
         codigo = f"AJAX-{uuid.uuid4().hex[:8]}"
         with app.test_client() as c:

@@ -45,6 +45,9 @@ jobs:
           DB_USER: root
           DB_PASSWORD: test
           DB_NAME: lacteosdb_test
+          # bootstrap_db.py importa config.py, que exige SECRET_KEY.
+          # No es la key de prod: es un valor fijo solo para el bootstrap.
+          SECRET_KEY: ci-bootstrap-secret-key-not-for-production-32c
 
       - name: Run tests
         run: pytest tests/ -v
@@ -54,3 +57,6 @@ jobs:
           TEST_DB_USER: root
           TEST_DB_PASSWORD: test
           TEST_DB_NAME: lacteosdb_test
+          # >= 32 chars para que config.py no rebote en CI
+          SECRET_KEY: ci-test-secret-key-not-for-production-32-chars
+          FLASK_DEBUG: "1"

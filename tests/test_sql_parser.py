@@ -147,7 +147,7 @@ class TestSplitSqlIntegracionSqlFiles:
         )
         if not os.path.exists(path):
             pytest.skip(f"archivo no encontrado: {path}")
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         stmts = split_sql(content)
         # Debe parsear todas las sentencias sin explotar
@@ -167,7 +167,7 @@ class TestSplitSqlIntegracionSqlFiles:
         )
         if not os.path.exists(path):
             pytest.skip(f"archivo no encontrado: {path}")
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         stmts = split_sql(content)
         # Debe haber 5 procedimientos transaccionales
